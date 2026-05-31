@@ -3,10 +3,11 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-VERSIONS_DIR="$SCRIPT_DIR/versions"
+ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+VERSIONS_DIR="$ROOT_DIR/versions"
 LOCAL_FONT_DIR="$HOME/.local/share/fonts"
 LOCAL_D2CODING_DIR="$LOCAL_FONT_DIR/D2Coding"
-SOURCE_FONT_DIR="$SCRIPT_DIR/fonts"
+SOURCE_FONT_DIR="$ROOT_DIR/fonts"
 SOURCE_D2CODING_DIR="$SOURCE_FONT_DIR/D2Coding"
 
 echo "NeoVim 환경설정 시작"
