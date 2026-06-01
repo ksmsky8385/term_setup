@@ -156,12 +156,11 @@ fi
 
 selected_dir="${version_dirs[$((choice_num - 1))]}"
 selected_name="$(basename "$selected_dir")"
-selected_init="$selected_dir/init.lua"
 
 echo
 echo "선택한 버전: $selected_name"
 echo "다음 작업을 진행합니다."
-echo "- ~/.config/nvim/init.lua 교체"
+echo "- ~/.config/nvim 전체 교체"
 echo "- ~/.cache/nvim 삭제"
 echo
 printf "진행하시겠습니까? [Y/n] "
@@ -170,9 +169,11 @@ read -r confirm
 case "$confirm" in
     "" | "y" | "Y" | "yes" | "YES")
         rm -rf ~/.cache/nvim
+        rm -rf ~/.config/nvim
 
         mkdir -p ~/.config/nvim
-        cp "$selected_init" ~/.config/nvim/init.lua
+
+        cp -R "$selected_dir"/. ~/.config/nvim/
 
         echo "Neovim 설정 완료. nvim 실행 후 작업을 완료하세요."
         ;;
