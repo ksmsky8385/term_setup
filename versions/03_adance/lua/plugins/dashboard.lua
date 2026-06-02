@@ -17,21 +17,63 @@ return {
             version.patch
         )
 
+        local ascii_header = {
+            "███╗   ██╗██╗   ██╗██╗███╗   ███╗",
+            "████╗  ██║██║   ██║██║████╗ ████║",
+            "██╔██╗ ██║██║   ██║██║██╔████╔██║",
+            "██║╚██╗██║╚██╗ ██╔╝██║██║╚██╔╝██║",
+            "██║ ╚████║ ╚████╔╝ ██║██║ ╚═╝ ██║ " .. version_text,
+            "╚═╝  ╚═══╝  ╚═══╝  ╚═╝╚═╝     ╚═╝",
+        }
+
+        local function get_header_width()
+            local width = 0
+
+            for _, line in ipairs(ascii_header) do
+                width = math.max(width, vim.fn.strdisplaywidth(line))
+            end
+
+            return width
+        end
+
+        local function wrap_path(path, max_width)
+            local lines = {}
+            local prefix = "root: "
+            local indent = "      "
+            local current = prefix
+
+            for part in string.gmatch(path, "[^/]+") do
+                local next_part = current .. "/" .. part
+
+                if vim.fn.strdisplaywidth(next_part) > max_width then
+                    table.insert(lines, current)
+                    current = indent .. "/" .. part
+                else
+                    current = next_part
+                end
+            end
+
+            table.insert(lines, current)
+
+            return lines
+        end
+
         local function make_header()
             local cwd = vim.g.current_workspace_root or vim.fn.getcwd()
+            local header_width = get_header_width()
+            local path_lines = wrap_path(cwd, header_width)
 
-            return {
-                "",
-                "███╗   ██╗██╗   ██╗██╗███╗   ███╗",
-                "████╗  ██║██║   ██║██║████╗ ████║",
-                "██╔██╗ ██║██║   ██║██║██╔████╔██║",
-                "██║╚██╗██║╚██╗ ██╔╝██║██║╚██╔╝██║",
-                "██║ ╚████║ ╚████╔╝ ██║██║ ╚═╝ ██║ " .. version_text,
-                "╚═╝  ╚═══╝  ╚═══╝  ╚═╝╚═╝     ╚═╝",
-                "",
-                "root: " .. cwd,
-                "",
-            }
+            local header = { "" }
+
+            vim.list_extend(header, ascii_header)
+
+            table.insert(header, "")
+
+            vim.list_extend(header, path_lines)
+
+            table.insert(header, "")
+
+            return header
         end
 
         dashboard.section.header.val = make_header()
