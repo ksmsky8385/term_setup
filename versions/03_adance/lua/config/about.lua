@@ -1,11 +1,16 @@
 local M = {}
 
+local function back_to_dashboard()
+    pcall(vim.cmd, "DashboardHome")
+end
+
 function M.open()
     vim.cmd("enew")
     vim.bo.buftype = "nofile"
     vim.bo.bufhidden = "wipe"
     vim.bo.swapfile = false
     vim.bo.modifiable = true
+    vim.wo.cursorline = true
 
     local version = vim.version()
     local version_text = string.format(
@@ -19,6 +24,8 @@ function M.open()
         "",
         "  NVIM  " .. version_text,
         "  ─────────────────────────────────────",
+        "",
+        "  < Back",
         "",
         "  기본 안내 명령어",
         "",
@@ -64,6 +71,30 @@ function M.open()
     vim.api.nvim_buf_set_lines(0, 0, -1, false, lines)
     vim.bo.modifiable = false
     vim.bo.filetype = "help"
+
+    vim.api.nvim_win_set_cursor(0, { 5, 2 })
+
+    vim.keymap.set("n", "<CR>", function()
+        if vim.api.nvim_win_get_cursor(0)[1] == 5 then
+            back_to_dashboard()
+        end
+    end, {
+        buffer = true,
+        silent = true,
+        desc = "Back to dashboard",
+    })
+
+    vim.keymap.set("n", "h", back_to_dashboard, {
+        buffer = true,
+        silent = true,
+        desc = "Back to dashboard",
+    })
+
+    vim.keymap.set("n", "b", back_to_dashboard, {
+        buffer = true,
+        silent = true,
+        desc = "Back to dashboard",
+    })
 
     vim.keymap.set("n", "q", ":bd<CR>", {
         buffer = true,

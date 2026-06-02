@@ -76,9 +76,7 @@ return {
             return header
         end
 
-        dashboard.section.header.val = make_header()
-
-        dashboard.section.buttons.val = {
+        local dashboard_buttons = {
             dashboard.button("e", "   New file", ":ene <BAR> startinsert<CR>"),
             dashboard.button("f", "   Find file", ":Telescope find_files<CR>"),
             dashboard.button("g", "󰊄   Search text", ":Telescope live_grep<CR>"),
@@ -88,9 +86,101 @@ return {
             dashboard.button("a", "   About Neovim", ":AboutNeovim<CR>"),
         }
 
+        local function dashboard_button_rows()
+            local rows = {}
+            local lines = vim.api.nvim_buf_get_lines(0, 0, -1, false)
+
+            for line_nr, line in ipairs(lines) do
+                for _, button in ipairs(dashboard_buttons) do
+                    if string.find(line, button.val, 1, true) then
+                        table.insert(rows, line_nr)
+                        break
+                    end
+                end
+            end
+
+            return rows
+        end
+
+        local function move_dashboard_cursor(delta)
+            local rows = dashboard_button_rows()
+
+            if #rows == 0 then
+                return
+            end
+
+            local current_row = vim.api.nvim_win_get_cursor(0)[1]
+            local target = nil
+
+            for idx, row in ipairs(rows) do
+                if row == current_row then
+                    local next_idx = idx + delta
+
+                    if next_idx < 1 then
+                        next_idx = #rows
+                    elseif next_idx > #rows then
+                        next_idx = 1
+                    end
+
+                    target = rows[next_idx]
+                    break
+                end
+            end
+
+            if not target then
+                if delta > 0 then
+                    for _, row in ipairs(rows) do
+                        if row > current_row then
+                            target = row
+                            break
+                        end
+                    end
+
+                    target = target or rows[1]
+                else
+                    for idx = #rows, 1, -1 do
+                        if rows[idx] < current_row then
+                            target = rows[idx]
+                            break
+                        end
+                    end
+
+                    target = target or rows[#rows]
+                end
+            end
+
+            vim.api.nvim_win_set_cursor(0, { target, 0 })
+            alpha.move_cursor(vim.api.nvim_get_current_win())
+        end
+
+        dashboard.section.header.val = make_header()
+        dashboard.section.buttons.val = dashboard_buttons
         dashboard.section.footer.val = {}
 
         alpha.setup(dashboard.opts)
+
+        vim.api.nvim_create_autocmd("User", {
+            pattern = "AlphaReady",
+            callback = function()
+                local opts = {
+                    buffer = true,
+                    silent = true,
+                }
+
+                vim.keymap.set("n", "j", function()
+                    move_dashboard_cursor(1)
+                end, opts)
+                vim.keymap.set("n", "<Down>", function()
+                    move_dashboard_cursor(1)
+                end, opts)
+                vim.keymap.set("n", "k", function()
+                    move_dashboard_cursor(-1)
+                end, opts)
+                vim.keymap.set("n", "<Up>", function()
+                    move_dashboard_cursor(-1)
+                end, opts)
+            end,
+        })
 
         vim.api.nvim_create_user_command("DashboardHome", function()
             dashboard.section.header.val = make_header()

@@ -1,87 +1,16 @@
 local about = require("config.about")
-
-local MY_THEMES = {
-    "vscode",
-    "onedark",
-    "tokyonight",
-    "habamax",
-    "slate",
-    "desert",
-    "industry",
-}
+local settings = require("config.settings")
 
 vim.api.nvim_create_user_command("ThemePick", function()
-    vim.ui.select(MY_THEMES, {
-        prompt = "변경할 테마를 선택하세요:",
-    }, function(choice)
-        if choice then
-            vim.cmd.colorscheme(choice)
-            vim.notify("테마 변경: " .. choice)
-        end
-    end)
+    settings.open("theme")
 end, {})
 
 vim.api.nvim_create_user_command("TSSettings", function()
-    local menu = {
-        "1. Tree-sitter parser list",
-        "2. Tree-sitter parser install",
-        "3. Tree-sitter parser remove",
-        "4. Tree-sitter parser update",
-    }
-
-    vim.ui.select(menu, {
-        prompt = "Tree-sitter settings:",
-    }, function(choice)
-        if choice == nil then
-            return
-        end
-
-        if choice:match("^1") then
-            vim.cmd("TSMyList")
-        elseif choice:match("^2") then
-            vim.ui.input({
-                prompt = "Install parser name: ",
-            }, function(lang)
-                if lang and lang ~= "" then
-                    vim.cmd("TSMyInstall " .. lang)
-                end
-            end)
-        elseif choice:match("^3") then
-            vim.ui.input({
-                prompt = "Remove parser name: ",
-            }, function(lang)
-                if lang and lang ~= "" then
-                    vim.cmd("TSMyUninstall " .. lang)
-                end
-            end)
-        elseif choice:match("^4") then
-            vim.cmd("TSMyUpdate")
-        end
-    end)
+    settings.open("treesitter")
 end, {})
 
 vim.api.nvim_create_user_command("MainSettings", function()
-    local menu = {
-        "1. Change theme",
-        "2. Tree-sitter settings",
-        "3. Update plugins",
-    }
-
-    vim.ui.select(menu, {
-        prompt = "Settings:",
-    }, function(choice)
-        if choice == nil then
-            return
-        end
-
-        if choice:match("^1") then
-            vim.cmd("ThemePick")
-        elseif choice:match("^2") then
-            vim.cmd("TSSettings")
-        elseif choice:match("^3") then
-            vim.cmd("Lazy sync")
-        end
-    end)
+    settings.open()
 end, {})
 
 vim.api.nvim_create_user_command("AboutNeovim", function()

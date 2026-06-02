@@ -11,6 +11,18 @@ end, {
     desc = "Open dashboard in current window",
 })
 
+vim.keymap.set("n", "<leader>t", require("config.terminal").toggle_window_terminal, {
+    noremap = true,
+    silent = true,
+    desc = "Toggle terminal in current window",
+})
+
+vim.keymap.set("n", "<leader>T", require("config.terminal").pick_terminal, {
+    noremap = true,
+    silent = true,
+    desc = "Pick running terminal",
+})
+
 vim.keymap.set("n", "<leader>sv", ":vsplit<CR>", {
     noremap = true,
     silent = true,
