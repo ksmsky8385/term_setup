@@ -133,8 +133,6 @@ if [ "$choice_num" -eq 0 ]; then
             rm -f ~/.local/bin/rg
             rm -f ~/.local/bin/tree-sitter
 
-            rm -rf ~/.local/share/fonts/D2Coding
-
             echo "Neovim 관련 설정 및 플러그인 완전 초기화 완료"
             exit 0
             ;;

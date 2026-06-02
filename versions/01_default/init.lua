@@ -115,11 +115,11 @@ require("lazy").setup({
     -- 색상 테마
     -- -----------------------------------------------------
     {
-        "folke/tokyonight.nvim",
+        "folke/vscode.nvim",
         lazy = false,
         priority = 1000,
         config = function()
-            vim.cmd.colorscheme("tokyonight")
+            vim.cmd.colorscheme("vscode")
         end,
     },
 
