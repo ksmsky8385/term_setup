@@ -11,6 +11,7 @@ return {
         local preview_win
         local preview_buf
         local preview_tree_win
+        local preview_path
 
         local function restore_nvim_tree_highlights()
             local ok, appearance = pcall(require, "nvim-tree.appearance")
@@ -32,6 +33,7 @@ return {
             preview_win = nil
             preview_buf = nil
             preview_tree_win = nil
+            preview_path = nil
         end
 
         local function focus_preview()
@@ -61,6 +63,15 @@ return {
                 return
             end
 
+            if
+                preview_path == node.absolute_path
+                and preview_win
+                and vim.api.nvim_win_is_valid(preview_win)
+            then
+                close_preview()
+                return
+            end
+
             local tree_win = vim.api.nvim_get_current_win()
             local tree_pos = vim.api.nvim_win_get_position(tree_win)
             local tree_width = vim.api.nvim_win_get_width(tree_win)
@@ -81,6 +92,7 @@ return {
 
             close_preview()
             preview_tree_win = tree_win
+            preview_path = node.absolute_path
 
             preview_buf = vim.api.nvim_create_buf(false, true)
             vim.api.nvim_buf_set_name(preview_buf, "nvim-tree-preview")
@@ -128,12 +140,33 @@ return {
                 desc = "Focus file tree",
             })
 
+            vim.keymap.set("n", "<Tab>", focus_tree, {
+                buffer = preview_buf,
+                noremap = true,
+                silent = true,
+                desc = "Focus file tree",
+            })
+
             vim.keymap.set("n", "<Esc>", close_preview, {
                 buffer = preview_buf,
                 noremap = true,
                 silent = true,
                 desc = "Close file preview",
             })
+        end
+
+        local function open_node()
+            local node = api.tree.get_node_under_cursor()
+
+            if not node then
+                return
+            end
+
+            if node and node.type == "file" then
+                close_preview()
+            end
+
+            api.node.open.edit(node)
         end
 
         require("nvim-tree").setup({
@@ -165,6 +198,13 @@ return {
                     "<Tab>",
                     open_preview,
                     opts("Preview file")
+                )
+
+                vim.keymap.set(
+                    "n",
+                    "<CR>",
+                    open_node,
+                    opts("Open")
                 )
 
                 vim.keymap.set(
