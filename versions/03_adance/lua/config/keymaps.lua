@@ -3,7 +3,31 @@ vim.keymap.set("t", "<Esc>", "<C-\\><C-n>", {
     silent = true,
 })
 
+local function is_nvim_tree()
+    return vim.bo.filetype == "NvimTree"
+end
+
+local function vertical_split_or_empty()
+    vim.cmd("rightbelow vsplit")
+
+    if is_nvim_tree() then
+        vim.cmd("enew")
+    end
+end
+
+local function horizontal_split_or_empty()
+    vim.cmd("rightbelow split")
+
+    if is_nvim_tree() then
+        vim.cmd("enew")
+    end
+end
+
 vim.keymap.set("n", "<leader>h", function()
+    if is_nvim_tree() then
+        return
+    end
+
     pcall(vim.cmd, "DashboardHome")
 end, {
     noremap = true,
@@ -23,13 +47,17 @@ vim.keymap.set("n", "<leader>T", require("config.terminal").pick_terminal, {
     desc = "Pick running terminal",
 })
 
-vim.keymap.set("n", "<leader>sv", ":vsplit<CR>", {
+vim.keymap.set("n", "<leader>sv", function()
+    vertical_split_or_empty()
+end, {
     noremap = true,
     silent = true,
     desc = "Vertical split",
 })
 
-vim.keymap.set("n", "<leader>sh", ":split<CR>", {
+vim.keymap.set("n", "<leader>sh", function()
+    horizontal_split_or_empty()
+end, {
     noremap = true,
     silent = true,
     desc = "Horizontal split",
