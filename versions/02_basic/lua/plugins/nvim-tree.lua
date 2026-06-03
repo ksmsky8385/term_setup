@@ -13,6 +13,47 @@ return {
         local preview_tree_win
         local preview_path
 
+        local function is_regular_window(win)
+            if not vim.api.nvim_win_is_valid(win) then
+                return false
+            end
+
+            if vim.api.nvim_win_get_config(win).relative ~= "" then
+                return false
+            end
+
+            local buf = vim.api.nvim_win_get_buf(win)
+
+            return vim.bo[buf].filetype ~= "NvimTree"
+        end
+
+        local function regular_window_count()
+            local count = 0
+
+            for _, win in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
+                if is_regular_window(win) then
+                    count = count + 1
+                end
+            end
+
+            return count
+        end
+
+        local function replace_duplicate_tree_window()
+            if vim.bo.filetype ~= "NvimTree" then
+                return
+            end
+
+            local tree_win = api.tree.winid()
+            local current_win = vim.api.nvim_get_current_win()
+
+            if not tree_win or current_win == tree_win then
+                return
+            end
+
+            vim.cmd("enew")
+        end
+
         local function restore_nvim_tree_highlights()
             local ok, appearance = pcall(require, "nvim-tree.appearance")
 
@@ -276,6 +317,22 @@ return {
 
         vim.api.nvim_create_autocmd("ColorScheme", {
             callback = restore_nvim_tree_highlights,
+        })
+
+        vim.api.nvim_create_autocmd("QuitPre", {
+            callback = function()
+                if
+                    vim.bo.filetype ~= "NvimTree"
+                    and regular_window_count() == 1
+                    and api.tree.is_visible()
+                then
+                    api.tree.close()
+                end
+            end,
+        })
+
+        vim.api.nvim_create_autocmd({ "BufWinEnter", "WinEnter" }, {
+            callback = replace_duplicate_tree_window,
         })
 
         vim.keymap.set("n", "<leader>e", ":TreeToggle<CR>", {

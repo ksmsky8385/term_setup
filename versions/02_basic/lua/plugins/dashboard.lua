@@ -8,6 +8,7 @@ return {
     config = function()
         local alpha = require("alpha")
         local dashboard = require("alpha.themes.dashboard")
+        local previous_file_buf = nil
 
         local version = vim.version()
         local version_text = string.format(
@@ -153,6 +154,34 @@ return {
             alpha.move_cursor(vim.api.nvim_get_current_win())
         end
 
+        local function is_file_buffer(buf)
+            return vim.api.nvim_buf_is_valid(buf)
+                and vim.bo[buf].buftype == ""
+                and vim.bo[buf].buflisted
+        end
+
+        local function is_dashboard_buffer(buf)
+            return vim.api.nvim_buf_is_valid(buf)
+                and vim.bo[buf].filetype == "alpha"
+        end
+
+        local function remember_current_file()
+            local buf = vim.api.nvim_get_current_buf()
+
+            if is_file_buffer(buf) then
+                previous_file_buf = buf
+            end
+        end
+
+        local function return_to_previous_file()
+            if previous_file_buf and is_file_buffer(previous_file_buf) then
+                vim.api.nvim_win_set_buf(0, previous_file_buf)
+                return true
+            end
+
+            return false
+        end
+
         dashboard.section.header.val = make_header()
         dashboard.section.buttons.val = dashboard_buttons
         dashboard.section.footer.val = {}
@@ -183,6 +212,14 @@ return {
         })
 
         vim.api.nvim_create_user_command("DashboardHome", function()
+            if is_dashboard_buffer(vim.api.nvim_get_current_buf()) then
+                if return_to_previous_file() then
+                    return
+                end
+            else
+                remember_current_file()
+            end
+
             dashboard.section.header.val = make_header()
             alpha.setup(dashboard.opts)
             vim.cmd("Alpha")
