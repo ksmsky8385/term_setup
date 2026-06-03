@@ -5,16 +5,7 @@ return {
         "williamboman/mason-lspconfig.nvim",
     },
     config = function()
-        local servers = {
-            "pyright",
-            "lua_ls",
-            "bashls",
-            "clangd",
-            "ts_ls",
-            "html",
-            "cssls",
-            "jsonls",
-        }
+        local servers = require("config.lsp_servers").servers
 
         for _, server in ipairs(servers) do
             vim.lsp.enable(server)

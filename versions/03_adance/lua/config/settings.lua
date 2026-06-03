@@ -65,6 +65,10 @@ local function menu_title()
         return "Settings > Tree-sitter"
     end
 
+    if state.menu == "lsp" then
+        return "Settings > LSP"
+    end
+
     return "Settings"
 end
 
@@ -264,6 +268,10 @@ menus.main = function()
                 menu = "treesitter",
             },
             {
+                label = "LSP settings",
+                menu = "lsp",
+            },
+            {
                 label = "Lazy settings",
                 action = function()
                     close()
@@ -337,6 +345,56 @@ menus.treesitter = function()
                 label = "Tree-sitter parser update",
                 action = function()
                     vim.cmd("TSMyUpdate")
+                end,
+            },
+        },
+    }
+end
+
+menus.lsp = function()
+    return {
+        rows = {
+            {
+                label = "LSP server list",
+                action = function()
+                    vim.cmd("LSPMyList")
+                end,
+            },
+            {
+                label = "LSP server install",
+                action = function()
+                    vim.ui.input({
+                        prompt = "Install LSP server name: ",
+                    }, function(server)
+                        if server and server ~= "" then
+                            vim.cmd("LSPMyInstall " .. server)
+                        end
+                    end)
+                end,
+            },
+            {
+                label = "LSP server remove",
+                action = function()
+                    vim.ui.input({
+                        prompt = "Remove LSP server name: ",
+                    }, function(server)
+                        if server and server ~= "" then
+                            vim.cmd("LSPMyUninstall " .. server)
+                        end
+                    end)
+                end,
+            },
+            {
+                label = "LSP server update registry",
+                action = function()
+                    vim.cmd("LSPMyUpdate")
+                end,
+            },
+            {
+                label = "Open Mason",
+                action = function()
+                    close()
+                    vim.cmd("Mason")
                 end,
             },
         },

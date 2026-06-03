@@ -6,6 +6,7 @@ return {
 
     config = function()
         local terminal = require("config.terminal")
+        local window_picker = require("config.window_picker")
         local api = require("nvim-tree.api")
         local preview_win
         local preview_buf
@@ -204,13 +205,27 @@ return {
                 open_file = {
                     window_picker = {
                         enable = true,
+                        chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890",
+                        picker = function()
+                            return window_picker.pick_window({
+                                filetype = {
+                                    "NvimTree",
+                                    "notify",
+                                },
+                                buftype = {
+                                    "terminal",
+                                },
+                            })
+                        end,
 
                         exclude = {
                             filetype = {
                                 "NvimTree",
                                 "notify",
                             },
-                            buftype = {},
+                            buftype = {
+                                "terminal",
+                            },
                         },
                     },
                 },

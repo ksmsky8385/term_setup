@@ -9,6 +9,10 @@ vim.api.nvim_create_user_command("TSSettings", function()
     settings.open("treesitter")
 end, {})
 
+vim.api.nvim_create_user_command("LSPSettings", function()
+    settings.open("lsp")
+end, {})
+
 vim.api.nvim_create_user_command("MainSettings", function()
     settings.open()
 end, {})

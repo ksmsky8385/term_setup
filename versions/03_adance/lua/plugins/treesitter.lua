@@ -1,23 +1,16 @@
 local MY_TS_LANGS = {
+    "c",
     "python",
     "lua",
-    "vim",
-    "vimdoc",
     "bash",
-    "c",
-    "cpp",
     "make",
-    "cmake",
     "json",
     "yaml",
     "toml",
     "markdown",
     "markdown_inline",
-    "html",
-    "css",
-    "javascript",
-    "typescript",
-    "tsx",
+    "vim",
+    "vimdoc",
 }
 
 local function configured_langs()
@@ -34,13 +27,12 @@ return {
     "nvim-treesitter/nvim-treesitter",
     branch = "master",
     lazy = false,
-    build = ":TSUpdate",
 
     config = function()
         require("nvim-treesitter.configs").setup({
-            ensure_installed = MY_TS_LANGS,
+            ensure_installed = {},
             sync_install = false,
-            auto_install = true,
+            auto_install = false,
 
             highlight = {
                 enable = true,
