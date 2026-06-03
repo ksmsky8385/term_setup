@@ -12,3 +12,4 @@ vim.opt.expandtab = false
 
 vim.opt.termguicolors = true
 vim.opt.clipboard = "unnamedplus"
+vim.opt.guicursor = "n-v-c-sm:block,i-ci-ve:block,r-cr-o:block,a:blinkwait700-blinkoff400-blinkon250"
