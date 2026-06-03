@@ -1,23 +1,16 @@
 local MY_TS_LANGS = {
-    "python",
-    "lua",
-    "vim",
-    "vimdoc",
     "bash",
     "c",
-    "cpp",
+    "python",
+    "lua",
     "make",
-    "cmake",
     "json",
     "yaml",
     "toml",
     "markdown",
     "markdown_inline",
-    "html",
-    "css",
-    "javascript",
-    "typescript",
-    "tsx",
+    "vim",
+    "vimdoc",
 }
 
 local function configured_langs()
