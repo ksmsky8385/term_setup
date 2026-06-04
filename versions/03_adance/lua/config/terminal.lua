@@ -129,6 +129,7 @@ function M.toggle_window_terminal()
     vim.w.terminal_previous_buf = current_buf
 
     if M.valid_terminal(vim.w.terminal_buf) then
+        vim.b[vim.w.terminal_buf].terminal_previous_buf = current_buf
         vim.api.nvim_win_set_buf(0, vim.w.terminal_buf)
         stop_terminal_insert()
         refresh_tree()
