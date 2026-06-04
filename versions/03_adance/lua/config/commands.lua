@@ -9,16 +9,16 @@ vim.api.nvim_create_user_command("TSSettings", function()
     settings.open("treesitter")
 end, {})
 
-vim.api.nvim_create_user_command("LSPSettings", function()
-    settings.open("lsp")
-end, {})
-
 vim.api.nvim_create_user_command("MainSettings", function()
     settings.open()
 end, {})
 
 vim.api.nvim_create_user_command("AboutNeovim", function()
     about.open()
+end, {})
+
+vim.api.nvim_create_user_command("TKill", function()
+    require("config.terminal").kill_current_terminal()
 end, {})
 
 vim.api.nvim_create_user_command("WorkspacePick", function()

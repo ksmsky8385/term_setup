@@ -1,6 +1,7 @@
 local M = {}
 
 local picker_chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890"
+local focus_picker_chars = "ABCDEFGHIJKLMNOPQRSUVWXYZ1234567890"
 local active_picker = nil
 
 local function is_excluded(win, exclude)
@@ -85,6 +86,39 @@ local function clear_prompt()
     if vim.opt.cmdheight._value ~= 0 then
         vim.cmd("normal! :")
     end
+end
+
+local function focusable_window(win)
+    if not vim.api.nvim_win_is_valid(win) then
+        return false
+    end
+
+    local config = vim.api.nvim_win_get_config(win)
+
+    if not config.focusable or config.hide or config.external then
+        return false
+    end
+
+    local buf = vim.api.nvim_win_get_buf(win)
+
+    return vim.bo[buf].filetype ~= "notify"
+end
+
+local function restore_picker(previous, laststatus, fillchars)
+    active_picker = nil
+    clear_prompt()
+
+    for win, options in pairs(previous) do
+        if vim.api.nvim_win_is_valid(win) then
+            for option, value in pairs(options) do
+                vim.api.nvim_set_option_value(option, value, { win = win })
+            end
+        end
+    end
+
+    vim.o.laststatus = laststatus
+    vim.opt.fillchars = fillchars
+    vim.cmd("redraw")
 end
 
 function M.pick_window(exclude)
@@ -205,22 +239,161 @@ function M.pick_window(exclude)
         end
     end
 
-    active_picker = nil
-    clear_prompt()
+    restore_picker(previous, laststatus, fillchars)
 
-    for win, options in pairs(previous) do
-        if vim.api.nvim_win_is_valid(win) then
-            for option, value in pairs(options) do
-                vim.api.nvim_set_option_value(option, value, { win = win })
+    return picked
+end
+
+function M.focus_window()
+    local windows = {}
+    local tree_win = nil
+
+    for _, win in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
+        if focusable_window(win) then
+            local buf = vim.api.nvim_win_get_buf(win)
+
+            if vim.bo[buf].filetype == "NvimTree" then
+                tree_win = win
+            else
+                table.insert(windows, win)
             end
         end
     end
 
-    vim.o.laststatus = laststatus
+    if tree_win then
+        table.insert(windows, tree_win)
+    end
+
+    if #windows == 0 then
+        vim.notify("No focusable windows", vim.log.levels.INFO)
+        return
+    end
+
+    if #windows == 1 then
+        vim.api.nvim_set_current_win(windows[1])
+        return
+    end
+
+    local previous = {}
+    local char_map = {}
+    local window_map = {}
+    local laststatus = vim.o.laststatus
+    local fillchars = vim.opt.fillchars:get()
+    local old_stl = fillchars.stl
+    local old_stlnc = fillchars.stlnc
+    local char_index = 1
+
+    vim.o.laststatus = 2
+    fillchars.stl = nil
+    fillchars.stlnc = nil
     vim.opt.fillchars = fillchars
+    fillchars.stl = old_stl
+    fillchars.stlnc = old_stlnc
+
+    for _, win in ipairs(windows) do
+        local buf = vim.api.nvim_win_get_buf(win)
+        local char
+
+        if vim.bo[buf].filetype == "NvimTree" then
+            char = "T"
+        else
+            char = focus_picker_chars:sub(char_index, char_index)
+            char_index = char_index + 1
+        end
+
+        if char == "" then
+            vim.notify("More windows than picker chars.", vim.log.levels.ERROR)
+            restore_picker(previous, laststatus, fillchars)
+            return
+        end
+
+        local ok_status, statusline = pcall(vim.api.nvim_get_option_value, "statusline", {
+            win = win,
+        })
+        local ok_hl, winhl = pcall(vim.api.nvim_get_option_value, "winhl", {
+            win = win,
+        })
+
+        previous[win] = {
+            statusline = ok_status and statusline or "",
+            winhl = ok_hl and winhl or "",
+        }
+        char_map[char] = win
+        window_map[win] = true
+
+        vim.api.nvim_set_option_value(
+            "statusline",
+            "%" .. win .. "@v:lua.require'config.window_picker'.on_picker_statusline_click@%=" .. char .. "%=%T",
+            { win = win }
+        )
+        vim.api.nvim_set_option_value(
+            "winhl",
+            "StatusLine:NvimTreeWindowPicker,StatusLineNC:NvimTreeWindowPicker",
+            { win = win }
+        )
+    end
+
+    active_picker = {
+        selected = nil,
+        window_map = window_map,
+    }
+
     vim.cmd("redraw")
 
-    return picked
+    if vim.opt.cmdheight._value ~= 0 then
+        print("Focus window: ")
+    end
+
+    local picked = nil
+
+    while true do
+        local ok, input = pcall(vim.fn.getcharstr)
+
+        if not ok then
+            break
+        end
+
+        if active_picker and active_picker.selected then
+            picked = active_picker.selected
+            break
+        end
+
+        local translated = vim.fn.keytrans(input or "")
+
+        if translated:find("Mouse", 1, true) then
+            local mouse = vim.fn.getmousepos()
+            local win = mouse.winid
+
+            if type(win) == "number" and window_map[win] then
+                picked = win
+                break
+            end
+        end
+
+        input = (input or ""):upper()
+
+        if input == "\13" or input == "\10" then
+            if active_picker and active_picker.selected then
+                picked = active_picker.selected
+            end
+            break
+        end
+
+        if input == "\27" then
+            break
+        end
+
+        if char_map[input] then
+            picked = char_map[input]
+            break
+        end
+    end
+
+    restore_picker(previous, laststatus, fillchars)
+
+    if picked and vim.api.nvim_win_is_valid(picked) then
+        vim.api.nvim_set_current_win(picked)
+    end
 end
 
 return M

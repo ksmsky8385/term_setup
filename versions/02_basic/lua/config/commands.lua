@@ -17,6 +17,10 @@ vim.api.nvim_create_user_command("AboutNeovim", function()
     about.open()
 end, {})
 
+vim.api.nvim_create_user_command("TKill", function()
+    require("config.terminal").kill_current_terminal()
+end, {})
+
 vim.api.nvim_create_user_command("WorkspacePick", function()
     vim.ui.input({
         prompt = "Workspace path: ",

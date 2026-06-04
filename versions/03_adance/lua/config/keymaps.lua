@@ -31,6 +31,9 @@ local function only_non_tree_window()
     vim.cmd("only")
 end
 
+local buffers = require("config.buffers")
+local window_picker = require("config.window_picker")
+
 vim.keymap.set("n", "<leader>h", function()
     if is_nvim_tree() then
         return
@@ -53,6 +56,62 @@ vim.keymap.set("n", "<leader>T", require("config.terminal").pick_terminal, {
     noremap = true,
     silent = true,
     desc = "Pick running terminal",
+})
+
+vim.keymap.set("n", "<leader>bb", buffers.pick, {
+    noremap = true,
+    silent = true,
+    desc = "Pick buffer",
+})
+
+vim.keymap.set("n", "<leader>bn", buffers.next, {
+    noremap = true,
+    silent = true,
+    desc = "Next buffer",
+})
+
+vim.keymap.set("n", "<leader>bp", buffers.previous, {
+    noremap = true,
+    silent = true,
+    desc = "Previous buffer",
+})
+
+vim.keymap.set("n", "<leader>bd", function()
+    buffers.delete_current(false)
+end, {
+    noremap = true,
+    silent = true,
+    desc = "Delete current buffer",
+})
+
+vim.keymap.set("n", "<leader>bD", function()
+    buffers.delete_current(true)
+end, {
+    noremap = true,
+    silent = true,
+    desc = "Force delete current buffer",
+})
+
+vim.keymap.set("n", "<leader>bo", function()
+    buffers.delete_others(false)
+end, {
+    noremap = true,
+    silent = true,
+    desc = "Delete other buffers",
+})
+
+vim.keymap.set("n", "<leader>bO", function()
+    buffers.delete_others(true)
+end, {
+    noremap = true,
+    silent = true,
+    desc = "Force delete other buffers",
+})
+
+vim.keymap.set("n", "<leader>ww", window_picker.focus_window, {
+    noremap = true,
+    silent = true,
+    desc = "Focus window",
 })
 
 vim.keymap.set("n", "<leader>wv", function()

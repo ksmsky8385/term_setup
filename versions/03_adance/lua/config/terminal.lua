@@ -1,5 +1,7 @@
 local M = {}
 
+local EX_TERMINAL_KIND = "ex"
+
 local function valid_buffer(buf)
     return buf and vim.api.nvim_buf_is_valid(buf)
 end
@@ -20,6 +22,14 @@ end
 
 local function shell_name()
     return vim.fn.fnamemodify(vim.o.shell, ":t")
+end
+
+local function terminal_label(buf)
+    if vim.b[buf].terminal_kind == EX_TERMINAL_KIND then
+        return "[EX]"
+    end
+
+    return "[-]"
 end
 
 local function stop_terminal_insert()
@@ -62,6 +72,43 @@ function M.valid_terminal(buf)
         and job_running(vim.b[buf].terminal_job_id)
 end
 
+function M.is_ex_terminal(buf)
+    return valid_buffer(buf)
+        and vim.bo[buf].buftype == "terminal"
+        and vim.b[buf].terminal_kind == EX_TERMINAL_KIND
+end
+
+function M.status_label(buf)
+    if not buf then
+        local win = vim.g.statusline_winid or vim.api.nvim_get_current_win()
+        buf = vim.api.nvim_win_get_buf(win)
+    end
+
+    if M.is_ex_terminal(buf) then
+        return "[EX]"
+    end
+
+    return ""
+end
+
+function M.is_status_terminal()
+    local win = vim.g.statusline_winid or vim.api.nvim_get_current_win()
+    local buf = vim.api.nvim_win_get_buf(win)
+
+    return vim.bo[buf].buftype == "terminal"
+end
+
+function M.status_name()
+    local win = vim.g.statusline_winid or vim.api.nvim_get_current_win()
+    local buf = vim.api.nvim_win_get_buf(win)
+
+    if vim.bo[buf].buftype ~= "terminal" then
+        return ""
+    end
+
+    return shell_name() .. " " .. terminal_label(buf)
+end
+
 function M.restore_terminal_window(buf)
     local previous_buf = vim.b[buf].terminal_previous_buf
 
@@ -85,6 +132,7 @@ end
 function M.setup_lifecycle(terminal_buf, terminal_win, job_id)
     vim.b[terminal_buf].terminal_job_id = job_id
     vim.b[terminal_buf].terminal_previous_buf = vim.w.terminal_previous_buf
+    vim.b[terminal_buf].terminal_kind = EX_TERMINAL_KIND
 
     vim.api.nvim_create_autocmd("TermClose", {
         buffer = terminal_buf,
@@ -152,32 +200,49 @@ end
 function M.terminals()
     local terminals = {}
     local labels = window_labels()
+    local seen = {}
+
+    local function previous_name_for(buf)
+        local previous_buf = vim.b[buf].terminal_previous_buf
+        local previous_name = valid_buffer(previous_buf)
+                and vim.api.nvim_buf_get_name(previous_buf)
+            or "[No Name]"
+
+        if previous_name == "" then
+            return "[No Name]"
+        end
+
+        return vim.fn.fnamemodify(previous_name, ":t")
+    end
+
+    local function add_terminal(win, buf)
+        if not M.valid_terminal(buf) or seen[buf] then
+            return
+        end
+
+        seen[buf] = true
+
+        table.insert(terminals, {
+            win = win,
+            buf = buf,
+            job = vim.b[buf].terminal_job_id,
+            shell = shell_name(),
+            previous = previous_name_for(buf),
+            label = terminal_label(buf),
+            visible = vim.api.nvim_win_get_buf(win) == buf,
+            window_label = labels[win] or "?",
+        })
+    end
 
     for _, win in ipairs(vim.api.nvim_list_wins()) do
         local terminal_buf = win_var(win, "terminal_buf")
+        local visible_buf = vim.api.nvim_win_get_buf(win)
 
-        if M.valid_terminal(terminal_buf) then
-            local previous_buf = vim.b[terminal_buf].terminal_previous_buf
-            local previous_name = valid_buffer(previous_buf)
-                    and vim.api.nvim_buf_get_name(previous_buf)
-                or "[No Name]"
-
-            if previous_name == "" then
-                previous_name = "[No Name]"
-            else
-                previous_name = vim.fn.fnamemodify(previous_name, ":t")
-            end
-
-            table.insert(terminals, {
-                win = win,
-                buf = terminal_buf,
-                job = vim.b[terminal_buf].terminal_job_id,
-                shell = shell_name(),
-                previous = previous_name,
-                visible = vim.api.nvim_win_get_buf(win) == terminal_buf,
-                window_label = labels[win] or "?",
-            })
+        add_terminal(win, terminal_buf)
+        if valid_buffer(terminal_buf) then
+            add_terminal(win, vim.b[terminal_buf].terminal_previous_buf)
         end
+        add_terminal(win, visible_buf)
     end
 
     return terminals
@@ -212,9 +277,10 @@ function M.pick_terminal()
         table.insert(
             lines,
             string.format(
-                "%d: [%s] %s (%s)",
+                "%d: [%s] %s %s (%s)",
                 idx,
                 terminal.window_label,
+                terminal.label,
                 terminal.shell,
                 state
             )
@@ -241,6 +307,39 @@ function M.pick_terminal()
     end
 
     M.show_terminal(index)
+end
+
+function M.kill_current_terminal()
+    local current_buf = vim.api.nvim_get_current_buf()
+
+    if vim.bo[current_buf].buftype ~= "terminal" then
+        vim.notify("Current buffer is not a terminal", vim.log.levels.WARN)
+        return
+    end
+
+    local job_id = vim.b[current_buf].terminal_job_id
+
+    if M.is_ex_terminal(current_buf) then
+        if job_running(job_id) then
+            pcall(vim.fn.jobstop, job_id)
+        else
+            M.restore_terminal_window(current_buf)
+        end
+
+        return
+    end
+
+    if job_running(job_id) then
+        pcall(vim.fn.jobstop, job_id)
+    end
+
+    vim.cmd("enew")
+
+    if valid_buffer(current_buf) then
+        pcall(vim.api.nvim_buf_delete, current_buf, { force = true })
+    end
+
+    refresh_tree()
 end
 
 return M
