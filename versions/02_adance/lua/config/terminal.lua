@@ -1,6 +1,7 @@
 local M = {}
 
 local EX_TERMINAL_KIND = "ex"
+local FLOAT_TERMINAL_KIND = "float"
 
 local function valid_buffer(buf)
     return buf and vim.api.nvim_buf_is_valid(buf)
@@ -40,6 +41,18 @@ local function stop_terminal_insert()
     )
 end
 
+local function floating_terminal_size()
+    local width = math.floor(vim.o.columns * 0.82)
+    local height = math.floor(vim.o.lines * 0.72)
+
+    width = math.max(width, 60)
+    height = math.max(height, 12)
+    width = math.min(width, vim.o.columns - 4)
+    height = math.min(height, vim.o.lines - 4)
+
+    return width, height
+end
+
 local function window_labels()
     local labels = {}
     local chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
@@ -76,6 +89,12 @@ function M.is_ex_terminal(buf)
     return valid_buffer(buf)
         and vim.bo[buf].buftype == "terminal"
         and vim.b[buf].terminal_kind == EX_TERMINAL_KIND
+end
+
+function M.is_float_terminal(buf)
+    return valid_buffer(buf)
+        and vim.bo[buf].buftype == "terminal"
+        and vim.b[buf].terminal_kind == FLOAT_TERMINAL_KIND
 end
 
 function M.status_label(buf)
@@ -155,6 +174,77 @@ function M.setup_lifecycle(terminal_buf, terminal_win, job_id)
             refresh_tree()
         end,
     })
+end
+
+function M.close_float_terminal(buf, win)
+    if win and vim.api.nvim_win_is_valid(win) then
+        pcall(vim.api.nvim_win_close, win, true)
+    end
+
+    if valid_buffer(buf) then
+        local job_id = vim.b[buf].terminal_job_id
+
+        if job_running(job_id) then
+            pcall(vim.fn.jobstop, job_id)
+        end
+
+        pcall(vim.api.nvim_buf_delete, buf, { force = true })
+    end
+end
+
+function M.open_float_terminal()
+    local buf = vim.api.nvim_create_buf(false, true)
+    local width, height = floating_terminal_size()
+    local win = vim.api.nvim_open_win(buf, true, {
+        relative = "editor",
+        width = width,
+        height = height,
+        row = math.floor((vim.o.lines - height) / 2),
+        col = math.floor((vim.o.columns - width) / 2),
+        style = "minimal",
+        border = "rounded",
+        title = " " .. shell_name() .. " ",
+        title_pos = "center",
+    })
+
+    vim.bo[buf].buflisted = false
+    vim.bo[buf].bufhidden = "wipe"
+    vim.wo[win].number = false
+    vim.wo[win].relativenumber = false
+    vim.wo[win].signcolumn = "no"
+
+    local job_id = vim.fn.termopen(vim.o.shell)
+
+    vim.b[buf].terminal_job_id = job_id
+    vim.b[buf].terminal_kind = FLOAT_TERMINAL_KIND
+
+    vim.keymap.set({ "n", "t" }, "<Esc>", function()
+        M.close_float_terminal(buf, win)
+    end, {
+        buffer = buf,
+        silent = true,
+        desc = "Close floating terminal",
+    })
+
+    vim.api.nvim_create_autocmd("TermClose", {
+        buffer = buf,
+        once = true,
+        callback = function()
+            vim.schedule(function()
+                M.close_float_terminal(buf, win)
+            end)
+        end,
+    })
+
+    vim.api.nvim_create_autocmd("WinClosed", {
+        pattern = tostring(win),
+        once = true,
+        callback = function()
+            M.close_float_terminal(buf, win)
+        end,
+    })
+
+    vim.cmd("startinsert")
 end
 
 function M.toggle_window_terminal()

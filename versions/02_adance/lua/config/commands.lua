@@ -29,6 +29,12 @@ end, {
     desc = "Open LSP settings",
 })
 
+vim.api.nvim_create_user_command("SettingsSnippets", function()
+    open_settings("snippets")
+end, {
+    desc = "Open snippet settings",
+})
+
 vim.api.nvim_create_user_command("ThemePick", function()
     open_settings("theme")
 end, {
@@ -45,6 +51,12 @@ vim.api.nvim_create_user_command("LSPSettings", function()
     open_settings("lsp")
 end, {
     desc = "Alias for SettingsLSP",
+})
+
+vim.api.nvim_create_user_command("SnippetSettings", function()
+    open_settings("snippets")
+end, {
+    desc = "Alias for SettingsSnippets",
 })
 
 vim.api.nvim_create_user_command("MainSettings", function()

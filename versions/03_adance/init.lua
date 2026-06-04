@@ -1,7 +1,0 @@
-require("config.options")
-require("config.paths")
-require("config.autocmds")
-require("config.keymaps")
-require("config.commands")
-require("config.lazy")
-require("config.themes").apply_saved()

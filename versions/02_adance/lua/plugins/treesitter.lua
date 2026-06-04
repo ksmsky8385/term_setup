@@ -83,7 +83,7 @@ return {
                 "",
                 "  < Back",
                 "",
-                "  [x] installed    [ ] not installed    * configured",
+                "  [x] installed    [ ] not installed    * recommended",
                 "",
             }
 

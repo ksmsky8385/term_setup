@@ -58,6 +58,12 @@ vim.keymap.set("n", "<leader>T", require("config.terminal").pick_terminal, {
     desc = "Pick running terminal",
 })
 
+vim.keymap.set("n", "<leader>`", require("config.terminal").open_float_terminal, {
+    noremap = true,
+    silent = true,
+    desc = "Open floating terminal",
+})
+
 vim.keymap.set("n", "<leader>bb", buffers.pick, {
     noremap = true,
     silent = true,

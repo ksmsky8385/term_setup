@@ -110,6 +110,12 @@ local function open_main()
             end,
         },
         {
+            label = "Snippet settings",
+            action = function()
+                M.open("snippets")
+            end,
+        },
+        {
             label = "Lazy settings",
             action = function()
                 vim.cmd("Lazy")
@@ -324,6 +330,49 @@ local function open_lsp()
     })
 end
 
+local function open_snippets()
+    local completion = require("config.completion")
+    local state = completion.state
+
+    picker("Settings > Snippets", {
+        {
+            label = "< Back",
+            action = open_main,
+        },
+        {
+            label = "Snippets: "
+                .. (state.snippets and "enabled" or "disabled"),
+            action = function()
+                completion.toggle_snippets()
+                M.open("snippets")
+            end,
+        },
+        {
+            label = "Completion source: "
+                .. (state.snippet_source and "enabled" or "disabled"),
+            action = function()
+                completion.toggle_snippet_source()
+                M.open("snippets")
+            end,
+        },
+        {
+            label = "Friendly snippets: "
+                .. (state.friendly_snippets and "enabled" or "disabled"),
+            action = function()
+                completion.toggle_friendly_snippets()
+                M.open("snippets")
+            end,
+        },
+        {
+            label = "Reload snippets",
+            action = function()
+                completion.reload_snippets()
+                M.open("snippets")
+            end,
+        },
+    })
+end
+
 function M.open(menu)
     if menu == "theme" then
         open_theme()
@@ -331,6 +380,8 @@ function M.open(menu)
         open_treesitter()
     elseif menu == "lsp" then
         open_lsp()
+    elseif menu == "snippets" then
+        open_snippets()
     else
         open_main()
     end

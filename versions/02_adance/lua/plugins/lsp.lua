@@ -3,11 +3,21 @@ return {
     dependencies = {
         "williamboman/mason.nvim",
         "williamboman/mason-lspconfig.nvim",
+        "hrsh7th/cmp-nvim-lsp",
     },
     config = function()
         local servers = require("config.lsp_servers").servers
+        local capabilities = vim.lsp.protocol.make_client_capabilities()
+        local ok, cmp_nvim_lsp = pcall(require, "cmp_nvim_lsp")
+
+        if ok then
+            capabilities = cmp_nvim_lsp.default_capabilities(capabilities)
+        end
 
         for _, server in ipairs(servers) do
+            vim.lsp.config(server, {
+                capabilities = capabilities,
+            })
             vim.lsp.enable(server)
         end
 

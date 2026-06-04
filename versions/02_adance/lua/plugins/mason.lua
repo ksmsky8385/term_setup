@@ -188,7 +188,7 @@ return {
 
                 local servers = available_servers(mason_lspconfig)
                 local installed = installed_servers(mason_lspconfig)
-                local configured = lsp_servers.configured()
+                local recommended = lsp_servers.recommended()
                 local max_server_len = 0
 
                 for _, server in ipairs(servers) do
@@ -202,11 +202,14 @@ return {
                             vim.cmd("LSPSettings")
                         end,
                     },
+                    {
+                        label = "[x] installed    [ ] not installed    * recommended",
+                    },
                 }
 
                 for _, server in ipairs(servers) do
                     local status = installed[server] and "[x]" or "[ ]"
-                    local marker = configured[server] and "*" or " "
+                    local marker = recommended[server] and "*" or " "
 
                     table.insert(entries, {
                         label = string.format(
@@ -244,6 +247,14 @@ return {
                     end
 
                     local servers = available_servers(mason_lspconfig)
+                    local installed = installed_servers(mason_lspconfig)
+                    local recommended = lsp_servers.recommended()
+                    local max_server_len = 0
+
+                    for _, server in ipairs(servers) do
+                        max_server_len = math.max(max_server_len, #server)
+                    end
+
                     local entries = {
                         {
                             label = "< Back",
@@ -251,11 +262,23 @@ return {
                                 vim.cmd("LSPSettings")
                             end,
                         },
+                        {
+                            label = "[x] installed    [ ] not installed    * recommended",
+                        },
                     }
 
                     for _, server in ipairs(servers) do
+                        local status = installed[server] and "[x]" or "[ ]"
+                        local marker = recommended[server] and "*" or " "
+
                         table.insert(entries, {
-                            label = server,
+                            label = string.format(
+                                "%s %s %-" .. max_server_len .. "s",
+                                status,
+                                marker,
+                                server
+                            ),
+                            ordinal = server,
                             action = function()
                                 vim.cmd(
                                     "LSPMyInstall " .. vim.fn.fnameescape(server)

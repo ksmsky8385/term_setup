@@ -22,4 +22,6 @@ function M.configured()
     return servers
 end
 
+M.recommended = M.configured
+
 return M
