@@ -1,17 +1,57 @@
 local about = require("config.about")
 local settings = require("config.settings")
 
+local function open_settings(menu)
+    settings.open(menu)
+end
+
+vim.api.nvim_create_user_command("Settings", function()
+    open_settings()
+end, {
+    desc = "Open settings",
+})
+
+vim.api.nvim_create_user_command("SettingsTheme", function()
+    open_settings("theme")
+end, {
+    desc = "Open theme settings",
+})
+
+vim.api.nvim_create_user_command("SettingsTreeSitter", function()
+    open_settings("treesitter")
+end, {
+    desc = "Open Tree-sitter settings",
+})
+
+vim.api.nvim_create_user_command("SettingsLSP", function()
+    open_settings("lsp")
+end, {
+    desc = "Open LSP settings",
+})
+
 vim.api.nvim_create_user_command("ThemePick", function()
-    settings.open("theme")
-end, {})
+    open_settings("theme")
+end, {
+    desc = "Alias for SettingsTheme",
+})
 
 vim.api.nvim_create_user_command("TSSettings", function()
-    settings.open("treesitter")
-end, {})
+    open_settings("treesitter")
+end, {
+    desc = "Alias for SettingsTreeSitter",
+})
+
+vim.api.nvim_create_user_command("LSPSettings", function()
+    open_settings("lsp")
+end, {
+    desc = "Alias for SettingsLSP",
+})
 
 vim.api.nvim_create_user_command("MainSettings", function()
-    settings.open()
-end, {})
+    open_settings()
+end, {
+    desc = "Alias for Settings",
+})
 
 vim.api.nvim_create_user_command("AboutNeovim", function()
     about.open()

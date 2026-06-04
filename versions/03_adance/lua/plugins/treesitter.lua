@@ -30,7 +30,7 @@ return {
 
     config = function()
         require("nvim-treesitter.configs").setup({
-            ensure_installed = {},
+            ensure_installed = MY_TS_LANGS,
             sync_install = false,
             auto_install = false,
 

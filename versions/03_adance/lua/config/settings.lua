@@ -2,17 +2,6 @@ local themes = require("config.themes")
 
 local M = {}
 
-local state = {
-    buf = nil,
-    menu = "main",
-    stack = {},
-    rows = {},
-    preview_origin = nil,
-    committed_theme = nil,
-}
-
-local menus = {}
-
 local function current_theme()
     return vim.g.colors_name or themes.default
 end
@@ -34,385 +23,316 @@ local function apply_theme(theme, notify)
     return false
 end
 
-local function restore_preview()
-    if state.preview_origin then
-        apply_theme(state.preview_origin, false)
-        state.preview_origin = nil
-        state.committed_theme = nil
+local function load_telescope()
+    local ok, telescope = pcall(function()
+        return {
+            actions = require("telescope.actions"),
+            action_state = require("telescope.actions.state"),
+            conf = require("telescope.config").values,
+            finders = require("telescope.finders"),
+            pickers = require("telescope.pickers"),
+        }
+    end)
+
+    if not ok then
+        vim.notify("telescope.nvim is not available", vim.log.levels.ERROR)
+        return nil
     end
+
+    return telescope
 end
 
-local function close()
-    restore_preview()
+local function picker(title, entries, opts)
+    opts = opts or {}
 
-    if state.buf and vim.api.nvim_buf_is_valid(state.buf) then
-        pcall(vim.cmd, "DashboardHome")
-    end
-end
+    local telescope = load_telescope()
 
-local function set_lines(lines)
-    vim.bo[state.buf].modifiable = true
-    vim.api.nvim_buf_set_lines(state.buf, 0, -1, false, lines)
-    vim.bo[state.buf].modifiable = false
-end
-
-local function menu_title()
-    if state.menu == "theme" then
-        return "Settings > Theme"
-    end
-
-    if state.menu == "treesitter" then
-        return "Settings > Tree-sitter"
-    end
-
-    if state.menu == "lsp" then
-        return "Settings > LSP"
-    end
-
-    return "Settings"
-end
-
-local function render()
-    local menu = menus[state.menu]()
-    state.rows = menu.rows
-
-    local lines = {
-        "",
-        "  " .. menu_title(),
-        "  " .. string.rep("-", vim.fn.strdisplaywidth(menu_title())),
-        "",
-    }
-
-    table.insert(lines, "  < Back")
-    table.insert(lines, "")
-
-    for _, row in ipairs(state.rows) do
-        table.insert(lines, "  " .. row.label)
-    end
-
-    table.insert(lines, "")
-    table.insert(lines, "  j/k or arrows: move    Enter/l: open    h/b: back    q: close")
-
-    set_lines(lines)
-
-    local first_row = 5
-    vim.api.nvim_win_set_cursor(0, { first_row, 2 })
-end
-
-local function selected_index()
-    local row = vim.api.nvim_win_get_cursor(0)[1]
-    local start = 7
-    local idx = row - start + 1
-
-    if idx >= 1 and idx <= #state.rows then
-        return idx
-    end
-
-    return nil
-end
-
-local function move(delta)
-    local back_row = 5
-    local start = 7
-    local last = start + #state.rows - 1
-    local row = vim.api.nvim_win_get_cursor(0)[1]
-
-    if row == back_row then
-        row = delta > 0 and start or last
-    else
-        row = row + delta
-    end
-
-    if row == start - 1 then
-        row = back_row
-    elseif row < back_row then
-        row = last
-    elseif row > last then
-        row = back_row
-    end
-
-    vim.api.nvim_win_set_cursor(0, { row, 2 })
-end
-
-local function enter_menu(name)
-    if state.menu == "theme" then
-        restore_preview()
-    end
-
-    table.insert(state.stack, state.menu)
-    state.menu = name
-    render()
-end
-
-local function back()
-    if state.menu == "theme" then
-        restore_preview()
-    end
-
-    local previous = table.remove(state.stack)
-
-    if previous then
-        state.menu = previous
-        render()
-    else
-        close()
-    end
-end
-
-local function activate()
-    local cursor_row = vim.api.nvim_win_get_cursor(0)[1]
-
-    if cursor_row == 5 then
-        back()
+    if not telescope then
         return
     end
 
-    local idx = selected_index()
+    telescope.pickers
+        .new({}, {
+            prompt_title = title,
+            finder = telescope.finders.new_table({
+                results = entries,
+                entry_maker = function(entry)
+                    return {
+                        value = entry,
+                        display = entry.label,
+                        ordinal = entry.ordinal or entry.label,
+                    }
+                end,
+            }),
+            sorter = telescope.conf.generic_sorter({}),
+            previewer = false,
+            attach_mappings = function(prompt_bufnr, map)
+                local select_entry = function()
+                    local selected = telescope.action_state.get_selected_entry()
 
-    if not idx then
-        return
-    end
+                    telescope.actions.close(prompt_bufnr)
 
-    local row = state.rows[idx]
+                    if selected and selected.value and selected.value.action then
+                        selected.value.action()
+                    end
+                end
 
-    if row.menu then
-        enter_menu(row.menu)
-        return
-    end
+                telescope.actions.select_default:replace(select_entry)
 
-    if row.action then
-        row.action()
-    end
+                if opts.mappings then
+                    opts.mappings(prompt_bufnr, map, telescope)
+                end
+
+                return true
+            end,
+        })
+        :find()
 end
 
-local function preview_theme()
-    if state.menu ~= "theme" then
-        return
-    end
-
-    local idx = selected_index()
-
-    if not idx then
-        return
-    end
-
-    local row = state.rows[idx]
-
-    if not row.theme then
-        return
-    end
-
-    if not state.preview_origin then
-        state.preview_origin = current_theme()
-    end
-
-    if state.committed_theme ~= row.theme then
-        apply_theme(row.theme, false)
-    end
-end
-
-local function setup_buffer()
-    vim.cmd("enew")
-    state.buf = vim.api.nvim_get_current_buf()
-
-    vim.bo.buftype = "nofile"
-    vim.bo.bufhidden = "wipe"
-    vim.bo.swapfile = false
-    vim.bo.filetype = "nvim-settings"
-    vim.wo.cursorline = true
-
-    local opts = {
-        buffer = true,
-        silent = true,
-    }
-
-    vim.keymap.set("n", "j", function()
-        move(1)
-        preview_theme()
-    end, opts)
-    vim.keymap.set("n", "<Down>", function()
-        move(1)
-        preview_theme()
-    end, opts)
-    vim.keymap.set("n", "k", function()
-        move(-1)
-        preview_theme()
-    end, opts)
-    vim.keymap.set("n", "<Up>", function()
-        move(-1)
-        preview_theme()
-    end, opts)
-    vim.keymap.set("n", "l", activate, opts)
-    vim.keymap.set("n", "<CR>", activate, opts)
-    vim.keymap.set("n", "h", back, opts)
-    vim.keymap.set("n", "b", back, opts)
-    vim.keymap.set("n", "q", close, opts)
-    vim.keymap.set("n", "<Esc>", close, opts)
-
-    vim.api.nvim_create_autocmd("BufWipeout", {
-        buffer = state.buf,
-        once = true,
-        callback = restore_preview,
+local function open_main()
+    picker("Settings", {
+        {
+            label = "Change theme",
+            action = function()
+                M.open("theme")
+            end,
+        },
+        {
+            label = "Tree-sitter settings",
+            action = function()
+                M.open("treesitter")
+            end,
+        },
+        {
+            label = "LSP settings",
+            action = function()
+                M.open("lsp")
+            end,
+        },
+        {
+            label = "Lazy settings",
+            action = function()
+                vim.cmd("Lazy")
+            end,
+        },
     })
 end
 
-menus.main = function()
-    return {
-        rows = {
-            {
-                label = "Change theme",
-                menu = "theme",
-            },
-            {
-                label = "Tree-sitter settings",
-                menu = "treesitter",
-            },
-            {
-                label = "LSP settings",
-                menu = "lsp",
-            },
-            {
-                label = "Lazy settings",
-                action = function()
-                    close()
-                    vim.cmd("Lazy")
-                end,
-            },
+local function open_theme()
+    local active = current_theme()
+    local entries = {
+        {
+            label = "< Back",
+            action = open_main,
         },
     }
-end
-
-menus.theme = function()
-    local rows = {}
-    local active = current_theme()
 
     for _, theme in ipairs(themes.available()) do
         local marker = theme == active and "* " or "  "
 
-        table.insert(rows, {
+        table.insert(entries, {
             label = marker .. theme,
-            theme = theme,
+            ordinal = theme,
             action = function()
                 if apply_theme(theme, true) then
                     themes.save(theme)
-                    state.preview_origin = nil
-                    state.committed_theme = theme
-                    render()
+                    M.open("theme")
                 end
             end,
         })
     end
 
-    return {
-        rows = rows,
-    }
+    picker("Settings > Theme", entries)
 end
 
-menus.treesitter = function()
-    return {
-        rows = {
-            {
-                label = "Tree-sitter parser list",
-                action = function()
-                    vim.cmd("TSMyList")
-                end,
-            },
-            {
-                label = "Tree-sitter parser install",
-                action = function()
-                    vim.ui.input({
-                        prompt = "Install parser name: ",
-                    }, function(lang)
-                        if lang and lang ~= "" then
-                            vim.cmd("TSMyInstall " .. lang)
-                        end
-                    end)
-                end,
-            },
-            {
-                label = "Tree-sitter parser remove",
-                action = function()
-                    vim.ui.input({
-                        prompt = "Remove parser name: ",
-                    }, function(lang)
-                        if lang and lang ~= "" then
-                            vim.cmd("TSMyUninstall " .. lang)
-                        end
-                    end)
-                end,
-            },
-            {
-                label = "Tree-sitter parser update",
-                action = function()
-                    vim.cmd("TSMyUpdate")
-                end,
-            },
+local open_treesitter
+
+local function open_treesitter_parser_list()
+    local ok, parsers = pcall(require, "nvim-treesitter.parsers")
+
+    if not ok then
+        vim.notify("nvim-treesitter parsers are not available", vim.log.levels.ERROR)
+        return
+    end
+
+    local parser_list = parsers.available_parsers()
+
+    table.sort(parser_list)
+
+    local entries = {
+        {
+            label = "< Back",
+            action = open_treesitter,
         },
     }
+
+    for _, lang in ipairs(parser_list) do
+        local installed = #vim.api.nvim_get_runtime_file(
+            "parser/" .. lang .. ".so",
+            false
+        ) > 0
+        local status = installed and "[x]" or "[ ]"
+
+        table.insert(entries, {
+            label = string.format("%s %s", status, lang),
+            ordinal = lang,
+            action = function()
+                if installed then
+                    vim.cmd("TSMyUninstall " .. vim.fn.fnameescape(lang))
+                else
+                    vim.cmd("TSMyInstall " .. vim.fn.fnameescape(lang))
+                end
+            end,
+        })
+    end
+
+    picker("Tree-sitter Parsers", entries)
 end
 
-menus.lsp = function()
-    return {
-        rows = {
-            {
-                label = "LSP server list",
-                action = function()
-                    vim.cmd("LSPMyList")
-                end,
-            },
-            {
-                label = "LSP server install",
-                action = function()
-                    vim.ui.input({
-                        prompt = "Install LSP server name: ",
-                    }, function(server)
-                        if server and server ~= "" then
-                            vim.cmd("LSPMyInstall " .. server)
-                        end
-                    end)
-                end,
-            },
-            {
-                label = "LSP server remove",
-                action = function()
-                    vim.ui.input({
-                        prompt = "Remove LSP server name: ",
-                    }, function(server)
-                        if server and server ~= "" then
-                            vim.cmd("LSPMyUninstall " .. server)
-                        end
-                    end)
-                end,
-            },
-            {
-                label = "LSP server update registry",
-                action = function()
-                    vim.cmd("LSPMyUpdate")
-                end,
-            },
-            {
-                label = "Open Mason",
-                action = function()
-                    close()
-                    vim.cmd("Mason")
-                end,
-            },
+local function open_treesitter_install()
+    local ok, parsers = pcall(require, "nvim-treesitter.parsers")
+
+    if not ok then
+        vim.notify("nvim-treesitter parsers are not available", vim.log.levels.ERROR)
+        return
+    end
+
+    local parser_list = parsers.available_parsers()
+
+    table.sort(parser_list)
+
+    local entries = {
+        {
+            label = "< Back",
+            action = open_treesitter,
         },
     }
+
+    for _, lang in ipairs(parser_list) do
+        table.insert(entries, {
+            label = lang,
+            action = function()
+                vim.cmd("TSMyInstall " .. vim.fn.fnameescape(lang))
+            end,
+        })
+    end
+
+    picker("Install Tree-sitter Parser", entries)
+end
+
+local function open_treesitter_remove()
+    local ok, parsers = pcall(require, "nvim-treesitter.parsers")
+
+    if not ok then
+        vim.notify("nvim-treesitter parsers are not available", vim.log.levels.ERROR)
+        return
+    end
+
+    local parser_list = parsers.available_parsers()
+
+    table.sort(parser_list)
+
+    local entries = {
+        {
+            label = "< Back",
+            action = open_treesitter,
+        },
+    }
+
+    for _, lang in ipairs(parser_list) do
+        local installed = #vim.api.nvim_get_runtime_file(
+            "parser/" .. lang .. ".so",
+            false
+        ) > 0
+
+        if installed then
+            table.insert(entries, {
+                label = lang,
+                action = function()
+                    vim.cmd("TSMyUninstall " .. vim.fn.fnameescape(lang))
+                end,
+            })
+        end
+    end
+
+    picker("Remove Tree-sitter Parser", entries)
+end
+
+open_treesitter = function()
+    picker("Settings > Tree-sitter", {
+        {
+            label = "< Back",
+            action = open_main,
+        },
+        {
+            label = "Parser list",
+            action = open_treesitter_parser_list,
+        },
+        {
+            label = "Parser install",
+            action = open_treesitter_install,
+        },
+        {
+            label = "Parser remove",
+            action = open_treesitter_remove,
+        },
+        {
+            label = "Parser update",
+            action = function()
+                vim.cmd("TSMyUpdate")
+            end,
+        },
+    })
+end
+
+local function open_lsp()
+    picker("Settings > LSP", {
+        {
+            label = "< Back",
+            action = open_main,
+        },
+        {
+            label = "Server list",
+            action = function()
+                vim.cmd("LSPMyList")
+            end,
+        },
+        {
+            label = "Server install",
+            action = function()
+                vim.cmd("LSPMyInstall")
+            end,
+        },
+        {
+            label = "Server remove",
+            action = function()
+                vim.cmd("LSPMyUninstall")
+            end,
+        },
+        {
+            label = "Update registry",
+            action = function()
+                vim.cmd("LSPMyUpdate")
+            end,
+        },
+        {
+            label = "Open Mason",
+            action = function()
+                vim.cmd("Mason")
+            end,
+        },
+    })
 end
 
 function M.open(menu)
-    state.menu = menu or "main"
-    state.stack = {}
-    state.rows = {}
-    state.preview_origin = nil
-    state.committed_theme = nil
-
-    setup_buffer()
-    render()
-
-    if state.menu == "theme" then
-        preview_theme()
+    if menu == "theme" then
+        open_theme()
+    elseif menu == "treesitter" then
+        open_treesitter()
+    elseif menu == "lsp" then
+        open_lsp()
+    else
+        open_main()
     end
 end
 

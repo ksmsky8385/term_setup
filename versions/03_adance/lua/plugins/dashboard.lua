@@ -83,7 +83,7 @@ return {
             dashboard.button("g", "󰊄   Search text", ":Telescope live_grep<CR>"),
             dashboard.button("w", "   Change workspace", ":WorkspacePick<CR>"),
             dashboard.button("t", "   Toggle tree", ":TreeToggle<CR>"),
-            dashboard.button("s", "   Settings", ":MainSettings<CR>"),
+            dashboard.button("s", "   Settings", ":Settings<CR>"),
             dashboard.button("a", "   About Neovim", ":AboutNeovim<CR>"),
         }
 
