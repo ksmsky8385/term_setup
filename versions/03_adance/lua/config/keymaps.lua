@@ -23,6 +23,14 @@ local function horizontal_split_or_empty()
     end
 end
 
+local function only_non_tree_window()
+    if is_nvim_tree() then
+        return
+    end
+
+    vim.cmd("only")
+end
+
 vim.keymap.set("n", "<leader>h", function()
     if is_nvim_tree() then
         return
@@ -47,7 +55,7 @@ vim.keymap.set("n", "<leader>T", require("config.terminal").pick_terminal, {
     desc = "Pick running terminal",
 })
 
-vim.keymap.set("n", "<leader>sv", function()
+vim.keymap.set("n", "<leader>wv", function()
     vertical_split_or_empty()
 end, {
     noremap = true,
@@ -55,12 +63,24 @@ end, {
     desc = "Vertical split",
 })
 
-vim.keymap.set("n", "<leader>sh", function()
+vim.keymap.set("n", "<leader>ws", function()
     horizontal_split_or_empty()
 end, {
     noremap = true,
     silent = true,
     desc = "Horizontal split",
+})
+
+vim.keymap.set("n", "<leader>wo", only_non_tree_window, {
+    noremap = true,
+    silent = true,
+    desc = "Close other windows",
+})
+
+vim.keymap.set("n", "<leader>wc", ":q<CR>", {
+    noremap = true,
+    silent = true,
+    desc = "Close current window",
 })
 
 vim.keymap.set("n", "<leader>sq", ":close<CR>", {
