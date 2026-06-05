@@ -3,6 +3,14 @@ vim.keymap.set("t", "<Esc>", "<C-\\><C-n>", {
     silent = true,
 })
 
+local function stop_terminal_insert()
+    vim.api.nvim_feedkeys(
+        vim.api.nvim_replace_termcodes("<C-\\><C-n>", true, false, true),
+        "n",
+        false
+    )
+end
+
 local function is_nvim_tree()
     return vim.bo.filetype == "NvimTree"
 end
@@ -33,10 +41,12 @@ end
 
 local buffers = require("config.buffers")
 local settings = require("config.settings")
+local terminal = require("config.terminal")
 local window_picker = require("config.window_picker")
 
 local ignored_quit_filetypes = {
     NvimTree = true,
+    alpha = true,
     notify = true,
 }
 
@@ -102,13 +112,23 @@ end
 
 local function leader_quit(force)
     local current_win = vim.api.nvim_get_current_win()
+    local current_buf = vim.api.nvim_get_current_buf()
 
-    if is_ignored_quit_window(current_win) or regular_window_count() > 1 then
+    if force and vim.bo[current_buf].buftype == "terminal" then
+        terminal.kill_current_terminal(force)
+        return
+    end
+
+    if is_ignored_quit_window(current_win) then
+        return
+    end
+
+    if regular_window_count() > 1 then
         vim.cmd(force and "quit!" or "quit")
         return
     end
 
-    local blocker = close_blocker(vim.api.nvim_get_current_buf(), force)
+    local blocker = close_blocker(current_buf, force)
 
     if blocker then
         vim.notify(blocker, vim.log.levels.WARN)
@@ -130,28 +150,28 @@ end, {
     desc = "Open dashboard in current window",
 })
 
-vim.keymap.set("n", "<leader>t", require("config.terminal").toggle_window_terminal, {
+vim.keymap.set("n", "<leader>t", terminal.toggle_window_terminal, {
     noremap = true,
     silent = true,
     desc = "Toggle terminal in current window",
 })
 
-vim.keymap.set("n", "<leader><C-t>", require("config.terminal").pick_terminal, {
+vim.keymap.set("n", "<leader><C-t>", terminal.pick_terminal, {
     noremap = true,
     silent = true,
     desc = "Pick running terminal",
 })
 
-vim.keymap.set("n", "<leader>T", require("config.terminal").create_buffer_terminal, {
+vim.keymap.set("n", "<leader>T", terminal.create_buffer_terminal, {
     noremap = true,
     silent = true,
     desc = "Create buffer terminal",
 })
 
-vim.keymap.set("n", "<leader>`", require("config.terminal").open_float_terminal, {
+vim.keymap.set({ "n", "t" }, "<leader>`", terminal.open_float_terminal, {
     noremap = true,
     silent = true,
-    desc = "Open floating terminal",
+    desc = "Toggle floating terminal",
 })
 
 vim.keymap.set("n", "<leader><C-q>", ":q<CR>", {
@@ -174,12 +194,34 @@ end, {
     desc = "Close current window",
 })
 
+vim.keymap.set("t", "<leader>q", function()
+    stop_terminal_insert()
+    vim.schedule(function()
+        leader_quit(false)
+    end)
+end, {
+    noremap = true,
+    silent = true,
+    desc = "Close current terminal window",
+})
+
 vim.keymap.set("n", "<leader>Q", function()
     leader_quit(true)
 end, {
     noremap = true,
     silent = true,
     desc = "Force close current window",
+})
+
+vim.keymap.set("t", "<leader>Q", function()
+    stop_terminal_insert()
+    vim.schedule(function()
+        leader_quit(true)
+    end)
+end, {
+    noremap = true,
+    silent = true,
+    desc = "Force close current terminal",
 })
 
 vim.keymap.set("n", "<leader><C-s>", function()

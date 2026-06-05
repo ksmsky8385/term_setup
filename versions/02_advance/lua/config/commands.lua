@@ -70,7 +70,7 @@ vim.api.nvim_create_user_command("AboutNeovim", function()
 end, {})
 
 vim.api.nvim_create_user_command("TKill", function()
-    require("config.terminal").kill_current_terminal()
+    require("config.terminal").kill_current_terminal(true)
 end, {})
 
 vim.api.nvim_create_user_command("WorkspacePick", function()

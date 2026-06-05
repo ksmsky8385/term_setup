@@ -3,6 +3,10 @@ local M = {}
 local EX_TERMINAL_KIND = "ex"
 local BUFFER_TERMINAL_KIND = "buffer"
 local FLOAT_TERMINAL_KIND = "float"
+local float_terminal = {
+    buf = nil,
+    win = nil,
+}
 
 local function valid_buffer(buf)
     return buf and vim.api.nvim_buf_is_valid(buf)
@@ -45,7 +49,7 @@ local function terminal_label(buf)
     end
 
     if vim.b[buf].terminal_kind == FLOAT_TERMINAL_KIND then
-        return "[Float]"
+        return "[Floating]"
     end
 
     return "[Buffer]"
@@ -69,6 +73,32 @@ local function floating_terminal_size()
     height = math.min(height, vim.o.lines - 4)
 
     return width, height
+end
+
+local function floating_terminal_config()
+    local width, height = floating_terminal_size()
+
+    return {
+        relative = "editor",
+        width = width,
+        height = height,
+        row = math.floor((vim.o.lines - height) / 2),
+        col = math.floor((vim.o.columns - width) / 2),
+        style = "minimal",
+        border = "rounded",
+        title = " " .. shell_name() .. " [Floating] ",
+        title_pos = "center",
+    }
+end
+
+local function valid_window(win)
+    return win and vim.api.nvim_win_is_valid(win)
+end
+
+local function configure_floating_window(win)
+    vim.wo[win].number = false
+    vim.wo[win].relativenumber = false
+    vim.wo[win].signcolumn = "no"
 end
 
 local function window_labels()
@@ -249,12 +279,24 @@ function M.create_buffer_terminal()
     refresh_tree()
 end
 
+function M.hide_float_terminal()
+    if valid_window(float_terminal.win) then
+        pcall(vim.api.nvim_win_close, float_terminal.win, true)
+    end
+
+    float_terminal.win = nil
+    refresh_tree()
+end
+
 function M.close_float_terminal(buf, win)
+    buf = buf or float_terminal.buf
+    win = win or float_terminal.win
+
     if mark_closing(buf) then
         return
     end
 
-    if win and vim.api.nvim_win_is_valid(win) then
+    if valid_window(win) then
         pcall(vim.api.nvim_win_close, win, true)
     end
 
@@ -267,48 +309,73 @@ function M.close_float_terminal(buf, win)
 
         pcall(vim.api.nvim_buf_delete, buf, { force = true })
     end
+
+    if buf == float_terminal.buf then
+        float_terminal.buf = nil
+        float_terminal.win = nil
+    end
+
+    refresh_tree()
 end
 
-function M.open_float_terminal()
-    local buf = vim.api.nvim_create_buf(false, true)
-    local width, height = floating_terminal_size()
-    local win = vim.api.nvim_open_win(buf, true, {
-        relative = "editor",
-        width = width,
-        height = height,
-        row = math.floor((vim.o.lines - height) / 2),
-        col = math.floor((vim.o.columns - width) / 2),
-        style = "minimal",
-        border = "rounded",
-        title = " " .. shell_name() .. " ",
-        title_pos = "center",
+function M.show_float_terminal(buf)
+    buf = buf or float_terminal.buf
+
+    if not M.valid_terminal(buf) then
+        return false
+    end
+
+    if valid_window(float_terminal.win) then
+        vim.api.nvim_set_current_win(float_terminal.win)
+        return true
+    end
+
+    local win = vim.api.nvim_open_win(buf, true, floating_terminal_config())
+
+    float_terminal.buf = buf
+    float_terminal.win = win
+    configure_floating_window(win)
+
+    vim.api.nvim_create_autocmd("WinClosed", {
+        pattern = tostring(win),
+        once = true,
+        callback = function()
+            if float_terminal.win == win then
+                float_terminal.win = nil
+            end
+
+            refresh_tree()
+        end,
     })
 
+    stop_terminal_insert()
+    refresh_tree()
+
+    return true
+end
+
+local function create_float_terminal()
+    local buf = vim.api.nvim_create_buf(false, true)
+    local win = vim.api.nvim_open_win(buf, true, floating_terminal_config())
+
+    float_terminal.buf = buf
+    float_terminal.win = win
+
     vim.bo[buf].buflisted = false
-    vim.bo[buf].bufhidden = "wipe"
-    vim.wo[win].number = false
-    vim.wo[win].relativenumber = false
-    vim.wo[win].signcolumn = "no"
+    vim.bo[buf].bufhidden = "hide"
+    configure_floating_window(win)
 
     local job_id = vim.fn.termopen(vim.o.shell)
 
     vim.b[buf].terminal_job_id = job_id
     vim.b[buf].terminal_kind = FLOAT_TERMINAL_KIND
 
-    vim.keymap.set({ "n", "t" }, "<Esc>", function()
-        M.close_float_terminal(buf, win)
-    end, {
-        buffer = buf,
-        silent = true,
-        desc = "Close floating terminal",
-    })
-
     vim.api.nvim_create_autocmd("TermClose", {
         buffer = buf,
         once = true,
         callback = function()
             vim.schedule(function()
-                M.close_float_terminal(buf, win)
+                M.close_float_terminal(buf, float_terminal.win)
             end)
         end,
     })
@@ -317,11 +384,29 @@ function M.open_float_terminal()
         pattern = tostring(win),
         once = true,
         callback = function()
-            M.close_float_terminal(buf, win)
+            if float_terminal.win == win then
+                float_terminal.win = nil
+            end
+
+            refresh_tree()
         end,
     })
 
     vim.cmd("startinsert")
+    refresh_tree()
+end
+
+function M.open_float_terminal()
+    if valid_window(float_terminal.win) then
+        M.hide_float_terminal()
+        return
+    end
+
+    if M.show_float_terminal(float_terminal.buf) then
+        return
+    end
+
+    create_float_terminal()
 end
 
 function M.toggle_window_terminal()
@@ -465,6 +550,11 @@ function M.show_terminal(index)
         return
     end
 
+    if M.is_float_terminal(terminal.buf) then
+        M.show_float_terminal(terminal.buf)
+        return
+    end
+
     local win = target_window(terminal)
 
     vim.api.nvim_set_current_win(win)
@@ -515,7 +605,7 @@ local function notify_terminal_error(err)
     end
 end
 
-local function kill_terminal(terminal, force)
+local function kill_terminal(terminal)
     if not terminal or not valid_buffer(terminal.buf) then
         return true
     end
@@ -523,12 +613,13 @@ local function kill_terminal(terminal, force)
     local buf = terminal.buf
     local job_id = vim.b[buf].terminal_job_id
 
+    if M.is_float_terminal(buf) then
+        M.close_float_terminal(buf, terminal.win)
+        return true
+    end
+
     if M.is_ex_terminal(buf) then
         if job_running(job_id) then
-            if not force then
-                return false, "Terminal process is still running in buffer " .. buf .. ". Use D/O to force."
-            end
-
             pcall(vim.fn.jobstop, job_id)
             return true
         else
@@ -539,10 +630,6 @@ local function kill_terminal(terminal, force)
     end
 
     if job_running(job_id) then
-        if not force then
-            return false, "Terminal process is still running in buffer " .. buf .. ". Use D/O to force."
-        end
-
         pcall(vim.fn.jobstop, job_id)
     end
 
@@ -565,7 +652,7 @@ local function kill_terminal(terminal, force)
     return true
 end
 
-local function kill_selected(prompt_bufnr, force)
+local function kill_selected(prompt_bufnr)
     local terminal = selected_terminal(prompt_bufnr)
 
     if not terminal then
@@ -575,8 +662,7 @@ local function kill_selected(prompt_bufnr, force)
     if
         not confirm_action(
             string.format(
-                "%s terminal buffer %d?",
-                force and "Force terminate process in" or "Terminate process in",
+                "Terminate process in terminal buffer %d?",
                 terminal.buf
             )
         )
@@ -584,7 +670,7 @@ local function kill_selected(prompt_bufnr, force)
         return
     end
 
-    local ok, err = kill_terminal(terminal, force)
+    local ok, err = kill_terminal(terminal)
 
     if not ok then
         notify_terminal_error(err)
@@ -595,7 +681,7 @@ local function kill_selected(prompt_bufnr, force)
     vim.schedule(M.pick_terminal)
 end
 
-local function keep_selected_only(prompt_bufnr, force)
+local function keep_selected_only(prompt_bufnr)
     local selected = selected_terminal(prompt_bufnr)
 
     if not selected then
@@ -605,8 +691,7 @@ local function keep_selected_only(prompt_bufnr, force)
     if
         not confirm_action(
             string.format(
-                "%s every terminal except buffer %d?",
-                force and "Force terminate process in" or "Terminate process in",
+                "Terminate every terminal except buffer %d?",
                 selected.buf
             )
         )
@@ -616,7 +701,7 @@ local function keep_selected_only(prompt_bufnr, force)
 
     for _, terminal in ipairs(M.terminals()) do
         if terminal.buf ~= selected.buf then
-            local ok, err = kill_terminal(terminal, force)
+            local ok, err = kill_terminal(terminal)
 
             if not ok then
                 notify_terminal_error(err)
@@ -626,11 +711,17 @@ local function keep_selected_only(prompt_bufnr, force)
     end
 
     close_picker(prompt_bufnr)
-    local win = target_window(selected)
 
-    vim.api.nvim_set_current_win(win)
-    vim.api.nvim_win_set_buf(win, selected.buf)
-    stop_terminal_insert()
+    if M.is_float_terminal(selected.buf) then
+        M.show_float_terminal(selected.buf)
+    else
+        local win = target_window(selected)
+
+        vim.api.nvim_set_current_win(win)
+        vim.api.nvim_win_set_buf(win, selected.buf)
+        stop_terminal_insert()
+    end
+
     refresh_tree()
 end
 
@@ -689,7 +780,7 @@ function M.pick_terminal()
     pickers.new({
         initial_mode = "normal",
         prompt_title = "Terminals",
-        results_title = "Enter open | d/D terminate process | o/O keep only | destructive actions ask Enter",
+        results_title = "Enter open | D terminate process | O keep only | actions ask Enter",
     }, {
         finder = finders.new_table({
             results = terminals,
@@ -716,20 +807,12 @@ function M.pick_terminal()
 
             actions.select_default:replace(open_selected)
 
-            map("n", "d", function()
-                kill_selected(prompt_bufnr, false)
-            end)
-
             map("n", "D", function()
-                kill_selected(prompt_bufnr, true)
-            end)
-
-            map("n", "o", function()
-                keep_selected_only(prompt_bufnr, false)
+                kill_selected(prompt_bufnr)
             end)
 
             map("n", "O", function()
-                keep_selected_only(prompt_bufnr, true)
+                keep_selected_only(prompt_bufnr)
             end)
 
             return true
@@ -737,7 +820,7 @@ function M.pick_terminal()
     }):find()
 end
 
-function M.kill_current_terminal()
+function M.kill_current_terminal(force)
     local current_buf = vim.api.nvim_get_current_buf()
 
     if vim.bo[current_buf].buftype ~= "terminal" then
@@ -746,6 +829,11 @@ function M.kill_current_terminal()
     end
 
     local job_id = vim.b[current_buf].terminal_job_id
+
+    if M.is_float_terminal(current_buf) then
+        M.close_float_terminal(current_buf, float_terminal.win)
+        return
+    end
 
     if M.is_ex_terminal(current_buf) then
         if job_running(job_id) then
@@ -757,14 +845,16 @@ function M.kill_current_terminal()
         return
     end
 
-    if job_running(job_id) then
+    local was_running = job_running(job_id)
+
+    if was_running then
         pcall(vim.fn.jobstop, job_id)
     end
 
     vim.cmd("enew")
 
     if valid_buffer(current_buf) then
-        pcall(vim.api.nvim_buf_delete, current_buf, { force = true })
+        pcall(vim.api.nvim_buf_delete, current_buf, { force = force or was_running })
     end
 
     refresh_tree()

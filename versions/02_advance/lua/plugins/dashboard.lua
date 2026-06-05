@@ -77,7 +77,56 @@ return {
             return header
         end
 
+        local function quit_blocker()
+            for _, buf in ipairs(vim.api.nvim_list_bufs()) do
+                if
+                    vim.api.nvim_buf_is_valid(buf)
+                    and vim.bo[buf].modified
+                    and vim.bo[buf].buftype ~= "terminal"
+                then
+                    local name = vim.api.nvim_buf_get_name(buf)
+
+                    if name == "" then
+                        name = "[No Name]"
+                    else
+                        name = vim.fn.fnamemodify(name, ":t")
+                    end
+
+                    return "Unsaved buffer: " .. name .. ". Save it or close it before quitting."
+                end
+            end
+
+            local ok_terminal, terminal = pcall(require, "config.terminal")
+
+            if ok_terminal and #terminal.terminals() > 0 then
+                return "Running terminals remain. Close them from Space Ctrl-t before quitting."
+            end
+
+            return nil
+        end
+
         local function confirm_quit()
+            local blocker = quit_blocker()
+
+            if blocker then
+                vim.api.nvim_echo({
+                    {
+                        blocker .. " Type Q or qa! then Enter to force quit, or press Esc to cancel.",
+                        "WarningMsg",
+                    },
+                }, false, {})
+
+                local ok, input = pcall(vim.fn.input, "")
+
+                vim.cmd("redraw")
+
+                if ok and (input == "Q" or input == "qa!") then
+                    vim.cmd("qa!")
+                end
+
+                return
+            end
+
             vim.api.nvim_echo({
                 { "Quit Neovim? Press Enter to confirm, Esc or any other key to cancel.", "WarningMsg" },
             }, false, {})
@@ -91,7 +140,7 @@ return {
             end
 
             if input == "\13" or input == "\10" or input == "\r" then
-                vim.cmd("qa!")
+                vim.cmd("qa")
             end
         end
 
