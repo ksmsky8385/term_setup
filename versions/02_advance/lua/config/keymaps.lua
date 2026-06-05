@@ -73,6 +73,32 @@ local function regular_window_count()
     return count
 end
 
+local function buffer_visible_in_other_window(buf, current_win)
+    if not vim.api.nvim_buf_is_valid(buf) then
+        return false
+    end
+
+    for _, win in ipairs(vim.api.nvim_list_wins()) do
+        if
+            win ~= current_win
+            and vim.api.nvim_win_is_valid(win)
+            and vim.api.nvim_win_get_buf(win) == buf
+        then
+            return true
+        end
+    end
+
+    return false
+end
+
+local function close_current_window_or_dashboard(current_win)
+    if regular_window_count() > 1 then
+        pcall(vim.api.nvim_win_close, current_win, true)
+    else
+        pcall(vim.cmd, "DashboardHome")
+    end
+end
+
 local function terminal_job_running(buf)
     local job_id = vim.b[buf].terminal_job_id
 
@@ -150,6 +176,11 @@ local function leader_quit(force)
     end
 
     if is_ignored_quit_window(current_win) then
+        return
+    end
+
+    if buffer_visible_in_other_window(current_buf, current_win) then
+        close_current_window_or_dashboard(current_win)
         return
     end
 
