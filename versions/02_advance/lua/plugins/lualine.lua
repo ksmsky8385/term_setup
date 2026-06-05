@@ -10,9 +10,7 @@ return {
             filetype = {
                 "NvimTree",
                 "notify",
-            },
-            buftype = {
-                "terminal",
+                "FloatingTerminal",
             },
         }
 
@@ -38,6 +36,10 @@ return {
             },
             sections = {
                 lualine_c = {
+                    {
+                        window_label,
+                        on_click = window_picker.focus_statusline_window,
+                    },
                     terminal.status_name,
                     {
                         "filename",

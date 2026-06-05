@@ -39,7 +39,7 @@ local function terminal_label(buf)
         return "[Floating]"
     end
 
-    return "[Buffer]"
+    return "[Terminal]"
 end
 
 local function stop_terminal_insert()
