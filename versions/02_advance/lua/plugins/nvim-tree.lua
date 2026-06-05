@@ -5,6 +5,7 @@ return {
     },
 
     config = function()
+        local buffers = require("config.buffers")
         local terminal = require("config.terminal")
         local window_picker = require("config.window_picker")
         local api = require("nvim-tree.api")
@@ -90,6 +91,31 @@ return {
             if preview_tree_win and vim.api.nvim_win_is_valid(preview_tree_win) then
                 vim.api.nvim_set_current_win(preview_tree_win)
             end
+        end
+
+        local function open_target_windows()
+            local windows = {}
+
+            for _, win in ipairs(window_picker.selectable_windows({
+                filetype = {
+                    "NvimTree",
+                    "notify",
+                },
+            })) do
+                if is_regular_window(win) then
+                    local buf = vim.api.nvim_win_get_buf(win)
+
+                    if vim.bo[buf].filetype ~= "notify" then
+                        table.insert(windows, win)
+                    end
+                end
+            end
+
+            return windows
+        end
+
+        local function primary_open_window()
+            return open_target_windows()[1]
         end
 
         local function open_preview()
@@ -196,7 +222,51 @@ return {
             })
         end
 
-        local function open_node()
+        local function open_file_in_window(node, target_win)
+            if not target_win or target_win == -1 then
+                api.node.open.edit(node)
+                return
+            end
+
+            local buf = vim.fn.bufadd(node.absolute_path)
+
+            vim.fn.bufload(buf)
+            vim.bo[buf].buflisted = true
+            local opened = buffers.open_buffer_in_window(buf, target_win, {
+                delete_old_if_safe = true,
+            })
+
+            if opened and vim.api.nvim_win_is_valid(target_win) then
+                vim.api.nvim_set_current_win(target_win)
+            end
+        end
+
+        local function pick_open_window()
+            return window_picker.pick_window({
+                filetype = {
+                    "NvimTree",
+                    "notify",
+                },
+            })
+        end
+
+        local function open_file_in_split(node, split_cmd)
+            local target_win = pick_open_window()
+
+            if not target_win or target_win == -1 then
+                return
+            end
+
+            vim.api.nvim_set_current_win(target_win)
+            window_picker.remember_window(target_win)
+            vim.cmd(split_cmd)
+
+            local split_win = vim.api.nvim_get_current_win()
+
+            open_file_in_window(node, split_win)
+        end
+
+        local function open_node(mode)
             local node = api.tree.get_node_under_cursor()
 
             if not node then
@@ -205,9 +275,33 @@ return {
 
             if node and node.type == "file" then
                 close_preview()
+            else
+                api.node.open.edit(node)
+                return
             end
 
-            api.node.open.edit(node)
+            if mode == "pick" then
+                local target_win = pick_open_window()
+
+                if not target_win or target_win == -1 then
+                    return
+                end
+
+                open_file_in_window(node, target_win)
+                return
+            end
+
+            if mode == "split" then
+                open_file_in_split(node, "rightbelow split")
+                return
+            end
+
+            if mode == "vsplit" then
+                open_file_in_split(node, "rightbelow vsplit")
+                return
+            end
+
+            open_file_in_window(node, primary_open_window())
         end
 
         require("nvim-tree").setup({
@@ -251,8 +345,55 @@ return {
                 vim.keymap.set(
                     "n",
                     "<CR>",
-                    open_node,
-                    opts("Open")
+                    function()
+                        open_node()
+                    end,
+                    opts("Open primary window")
+                )
+
+                vim.keymap.set(
+                    "n",
+                    "o",
+                    function()
+                        open_node()
+                    end,
+                    opts("Open primary window")
+                )
+
+                vim.keymap.set(
+                    "n",
+                    "<2-LeftMouse>",
+                    function()
+                        open_node()
+                    end,
+                    opts("Open primary window")
+                )
+
+                vim.keymap.set(
+                    "n",
+                    "w",
+                    function()
+                        open_node("pick")
+                    end,
+                    opts("Open with window picker")
+                )
+
+                vim.keymap.set(
+                    "n",
+                    "s",
+                    function()
+                        open_node("split")
+                    end,
+                    opts("Open in picked horizontal split")
+                )
+
+                vim.keymap.set(
+                    "n",
+                    "v",
+                    function()
+                        open_node("vsplit")
+                    end,
+                    opts("Open in picked vertical split")
                 )
 
                 vim.keymap.set(
@@ -292,7 +433,7 @@ return {
             actions = {
                 open_file = {
                     window_picker = {
-                        enable = true,
+                        enable = false,
                         chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890",
                         picker = function()
                             return window_picker.pick_window({

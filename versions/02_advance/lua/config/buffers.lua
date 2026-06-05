@@ -28,6 +28,9 @@ local function buffer_name(buf)
     return vim.fn.fnamemodify(name, ":t")
 end
 
+local hidden_replacement_buffer
+local movable_buffer
+
 local function terminal_job_running(buf)
     local job_id = vim.b[buf].terminal_job_id
 
@@ -51,14 +54,20 @@ local function delete_blocker(buf, force)
 end
 
 local function replacement_buffer(current)
+    local hidden = hidden_replacement_buffer(current)
+
+    if hidden then
+        return hidden
+    end
+
     local alternate = vim.fn.bufnr("#")
 
-    if alternate ~= current and valid_listed_buffer(alternate) then
+    if alternate ~= current and movable_buffer(alternate) then
         return alternate
     end
 
     for _, buf in ipairs(listed_buffers()) do
-        if buf ~= current then
+        if buf ~= current and movable_buffer(buf) then
             return buf
         end
     end
@@ -229,6 +238,139 @@ local function notify_delete_error(err)
     end
 end
 
+local function visible_windows_for_buffer(buf)
+    local windows = {}
+
+    if not vim.api.nvim_buf_is_valid(buf) then
+        return windows
+    end
+
+    for _, win in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
+        if vim.api.nvim_win_is_valid(win) and vim.api.nvim_win_get_buf(win) == buf then
+            table.insert(windows, win)
+        end
+    end
+
+    return windows
+end
+
+local function visible_window_count(buf)
+    return #visible_windows_for_buffer(buf)
+end
+
+local function buffer_terminal_kind(buf)
+    local ok_terminal, terminal = pcall(require, "config.terminal")
+
+    if not ok_terminal then
+        return nil
+    end
+
+    if terminal.is_ex_terminal(buf) then
+        return "toggle"
+    end
+
+    if terminal.is_float_terminal(buf) then
+        return "float"
+    end
+
+    if vim.bo[buf].buftype == "terminal" then
+        return "buffer"
+    end
+
+    return nil
+end
+
+movable_buffer = function(buf)
+    if not valid_listed_buffer(buf) then
+        return false
+    end
+
+    local filetype = vim.bo[buf].filetype
+
+    if filetype == "NvimTree" or filetype == "alpha" or filetype == "notify" then
+        return false
+    end
+
+    local buftype = vim.bo[buf].buftype
+
+    if buftype == "" then
+        return true
+    end
+
+    return buffer_terminal_kind(buf) == "buffer"
+end
+
+hidden_replacement_buffer = function(current)
+    local candidates = {}
+
+    for _, buf in ipairs(listed_buffers()) do
+        if buf ~= current and movable_buffer(buf) and visible_window_count(buf) == 0 then
+            table.insert(candidates, buf)
+        end
+    end
+
+    table.sort(candidates, function(a, b)
+        return vim.fn.getbufinfo(a)[1].lastused > vim.fn.getbufinfo(b)[1].lastused
+    end)
+
+    return candidates[1]
+end
+
+local function set_window_buffer(win, buf)
+    if
+        vim.api.nvim_win_is_valid(win)
+        and vim.api.nvim_buf_is_valid(buf)
+    then
+        vim.api.nvim_win_set_buf(win, buf)
+        return true
+    end
+
+    return false
+end
+
+local function replace_current_buffer(replacement)
+    if replacement and set_window_buffer(0, replacement) then
+        return replacement
+    end
+
+    vim.cmd("enew")
+    return nil
+end
+
+local function can_delete_unique_window_buffer(buf, force)
+    if not vim.api.nvim_buf_is_valid(buf) then
+        return false
+    end
+
+    if not movable_buffer(buf) then
+        return false
+    end
+
+    if visible_window_count(buf) ~= 1 then
+        return false
+    end
+
+    return delete_blocker(buf, force) == nil
+end
+
+local function window_for_buffer(buf)
+    return visible_windows_for_buffer(buf)[1]
+end
+
+local function fallback_buffer_for_displaced(buf)
+    local ok_terminal, terminal = pcall(require, "config.terminal")
+
+    if ok_terminal and terminal.is_ex_terminal(buf) then
+        local previous_buf = vim.b[buf].terminal_previous_buf
+
+        if vim.api.nvim_buf_is_valid(previous_buf) and previous_buf ~= buf then
+            return previous_buf
+        end
+    end
+
+    return vim.api.nvim_create_buf(true, false)
+end
+
 local function delete_selected(prompt_bufnr, force)
     local buf = selected_buffer(prompt_bufnr)
 
@@ -333,6 +475,68 @@ local function keep_selected_only(prompt_bufnr, force)
     focus_buffer(buf)
 end
 
+local function move_selected(prompt_bufnr)
+    local buf = selected_buffer(prompt_bufnr)
+
+    if not buf then
+        return
+    end
+
+    close_picker(prompt_bufnr)
+
+    vim.schedule(function()
+        local ok_picker, window_picker = pcall(require, "config.window_picker")
+
+        if not ok_picker then
+            return
+        end
+
+        local target_win = window_picker.pick_window({
+            filetype = {
+                "NvimTree",
+                "notify",
+            },
+        })
+
+        if not target_win or target_win == -1 then
+            return
+        end
+
+        M.move_buffer_to_window(buf, target_win)
+    end)
+end
+
+local function copy_selected(prompt_bufnr)
+    local buf = selected_buffer(prompt_bufnr)
+
+    if not buf then
+        return
+    end
+
+    close_picker(prompt_bufnr)
+
+    vim.schedule(function()
+        local ok_picker, window_picker = pcall(require, "config.window_picker")
+
+        if not ok_picker then
+            return
+        end
+
+        local target_win = window_picker.pick_window({
+            filetype = {
+                "NvimTree",
+                "notify",
+            },
+        })
+
+        if not target_win or target_win == -1 then
+            return
+        end
+
+        M.copy_buffer_to_window(buf, target_win)
+    end)
+end
+
 local function buffer_picker()
     local pickers = require("telescope.pickers")
     local finders = require("telescope.finders")
@@ -370,7 +574,7 @@ local function buffer_picker()
 
     pickers.new(opts, {
         prompt_title = "Buffers",
-        results_title = "Enter open | d/D delete | o/O keep only | destructive actions ask Enter",
+        results_title = "Enter open | m move | y copy | d/D delete | o/O keep only | destructive actions ask Enter",
         finder = finders.new_table({
             results = buffers,
             entry_maker = buffer_entry_maker(opts),
@@ -392,6 +596,14 @@ local function buffer_picker()
 
             map("n", "O", function()
                 keep_selected_only(prompt_bufnr, true)
+            end)
+
+            map("n", "m", function()
+                move_selected(prompt_bufnr)
+            end)
+
+            map("n", "y", function()
+                copy_selected(prompt_bufnr)
             end)
 
             return true
@@ -450,6 +662,172 @@ function M.delete_current(force)
     end
 
     return ok
+end
+
+function M.delete_current_to_empty(force)
+    local current = vim.api.nvim_get_current_buf()
+    local blocker = delete_blocker(current, force)
+
+    if blocker then
+        notify_delete_error(blocker)
+        return false
+    end
+
+    vim.cmd("enew")
+
+    local ok, err = delete_buffer(current, force)
+
+    if not ok then
+        notify_delete_error(err)
+    end
+
+    return ok
+end
+
+function M.delete_current_to_hidden_or_empty(force, fallback)
+    local current = vim.api.nvim_get_current_buf()
+    local blocker = delete_blocker(current, force)
+
+    if blocker then
+        notify_delete_error(blocker)
+        return false
+    end
+
+    replace_current_buffer(hidden_replacement_buffer(current) or fallback)
+
+    local ok, err = delete_buffer(current, force)
+
+    if not ok then
+        notify_delete_error(err)
+    end
+
+    return ok
+end
+
+function M.delete_current_to_hidden(force)
+    local current = vim.api.nvim_get_current_buf()
+    local replacement = hidden_replacement_buffer(current)
+
+    if not replacement then
+        return nil
+    end
+
+    local blocker = delete_blocker(current, force)
+
+    if blocker then
+        notify_delete_error(blocker)
+        return false
+    end
+
+    vim.api.nvim_win_set_buf(0, replacement)
+
+    local ok, err = delete_buffer(current, force)
+
+    if not ok then
+        notify_delete_error(err)
+    end
+
+    return ok
+end
+
+function M.move_buffer_to_window(buf, target_win)
+    if not movable_buffer(buf) then
+        vim.notify("Buffer can't be moved", vim.log.levels.WARN)
+        return false
+    end
+
+    if not vim.api.nvim_win_is_valid(target_win) then
+        return false
+    end
+
+    local source_win = window_for_buffer(buf)
+    local target_buf = vim.api.nvim_win_get_buf(target_win)
+
+    if source_win and source_win == target_win then
+        return true
+    end
+
+    if source_win and vim.api.nvim_win_is_valid(source_win) then
+        if movable_buffer(target_buf) then
+            vim.api.nvim_win_set_buf(source_win, target_buf)
+        else
+            vim.api.nvim_win_set_buf(source_win, fallback_buffer_for_displaced(target_buf))
+        end
+    end
+
+    vim.api.nvim_win_set_buf(target_win, buf)
+
+    return true
+end
+
+function M.copy_buffer_to_window(buf, target_win)
+    if not movable_buffer(buf) then
+        vim.notify("Buffer can't be copied", vim.log.levels.WARN)
+        return false
+    end
+
+    if not vim.api.nvim_win_is_valid(target_win) then
+        return false
+    end
+
+    if vim.api.nvim_win_get_buf(target_win) == buf then
+        return true
+    end
+
+    vim.api.nvim_win_set_buf(target_win, buf)
+
+    return true
+end
+
+function M.open_buffer_in_window(buf, target_win, opts)
+    opts = opts or {}
+
+    if not vim.api.nvim_buf_is_valid(buf) then
+        return false
+    end
+
+    if not vim.api.nvim_win_is_valid(target_win) then
+        return false
+    end
+
+    local old_buf = vim.api.nvim_win_get_buf(target_win)
+
+    if old_buf == buf then
+        return true
+    end
+
+    local old_visible_count = visible_window_count(old_buf)
+    local delete_old = opts.delete_old_if_safe
+        and old_visible_count == 1
+        and movable_buffer(old_buf)
+
+    if delete_old then
+        local can_delete = can_delete_unique_window_buffer(old_buf, opts.force)
+
+        if not can_delete then
+            local blocker = delete_blocker(old_buf, opts.force)
+
+            if blocker then
+                vim.notify(blocker, vim.log.levels.WARN)
+            end
+        end
+
+        vim.api.nvim_win_set_buf(target_win, buf)
+
+        if can_delete then
+            local ok, err = delete_buffer(old_buf, opts.force)
+
+            if not ok then
+                notify_delete_error(err)
+            end
+        end
+
+        return true
+    end
+
+    vim.api.nvim_win_set_buf(target_win, buf)
+
+    return true
 end
 
 function M.delete_others(force)

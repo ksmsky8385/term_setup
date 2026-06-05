@@ -15,20 +15,21 @@ local function is_nvim_tree()
     return vim.bo.filetype == "NvimTree"
 end
 
-local function vertical_split_or_empty()
-    vim.cmd("rightbelow vsplit")
+local function empty_unlisted_buffer()
+    vim.cmd("enew")
+    vim.bo.buflisted = false
+end
 
-    if is_nvim_tree() then
-        vim.cmd("enew")
-    end
+local function vertical_split_or_empty()
+    require("config.window_picker").remember_window()
+    vim.cmd("rightbelow vsplit")
+    empty_unlisted_buffer()
 end
 
 local function horizontal_split_or_empty()
+    require("config.window_picker").remember_window()
     vim.cmd("rightbelow split")
-
-    if is_nvim_tree() then
-        vim.cmd("enew")
-    end
+    empty_unlisted_buffer()
 end
 
 local function only_non_tree_window()
@@ -78,6 +79,12 @@ local function terminal_job_running(buf)
     return type(job_id) == "number" and vim.fn.jobwait({ job_id }, 0)[1] == -1
 end
 
+local function has_window_toggle_terminal(win)
+    local ok, terminal_buf = pcall(vim.api.nvim_win_get_var, win, "terminal_buf")
+
+    return ok and terminal.is_ex_terminal(terminal_buf)
+end
+
 local function close_blocker(buf, force)
     if not vim.api.nvim_buf_is_valid(buf) then
         return nil
@@ -115,7 +122,30 @@ local function leader_quit(force)
     local current_buf = vim.api.nvim_get_current_buf()
 
     if force and vim.bo[current_buf].buftype == "terminal" then
-        terminal.kill_current_terminal(force)
+        if has_window_toggle_terminal(current_win) then
+            terminal.kill_current_terminal(force)
+            return
+        end
+
+        local replaced = buffers.delete_current_to_hidden(force)
+
+        if replaced ~= nil then
+            return
+        end
+
+        terminal.kill_current_terminal({
+            force = force,
+            replace = false,
+        })
+
+        if vim.api.nvim_win_is_valid(current_win) then
+            if regular_window_count() > 1 then
+                pcall(vim.api.nvim_win_close, current_win, true)
+            else
+                pcall(vim.cmd, "DashboardHome")
+            end
+        end
+
         return
     end
 
@@ -123,7 +153,24 @@ local function leader_quit(force)
         return
     end
 
+    if has_window_toggle_terminal(current_win) then
+        local ok, terminal_buf = pcall(vim.api.nvim_win_get_var, current_win, "terminal_buf")
+
+        buffers.delete_current_to_hidden_or_empty(force, ok and terminal_buf or nil)
+        return
+    end
+
+    local replaced = buffers.delete_current_to_hidden(force)
+
+    if replaced ~= nil then
+        return
+    end
+
     if regular_window_count() > 1 then
+        if not buffers.delete_current(force) then
+            return
+        end
+
         vim.cmd(force and "quit!" or "quit")
         return
     end
@@ -326,12 +373,12 @@ vim.keymap.set("n", "<C-Down>", "<C-w>j", { noremap = true, silent = true })
 vim.keymap.set("n", "<C-Up>", "<C-w>k", { noremap = true, silent = true })
 vim.keymap.set("n", "<C-Right>", "<C-w>l", { noremap = true, silent = true })
 
-vim.keymap.set("n", "<A-Left>", ":vertical resize -2<CR>", { silent = true })
-vim.keymap.set("n", "<A-Right>", ":vertical resize +2<CR>", { silent = true })
-vim.keymap.set("n", "<A-Up>", ":resize +2<CR>", { silent = true })
-vim.keymap.set("n", "<A-Down>", ":resize -2<CR>", { silent = true })
+vim.keymap.set("n", "<A-Left>", ":vertical resize -1<CR>", { silent = true })
+vim.keymap.set("n", "<A-Right>", ":vertical resize +1<CR>", { silent = true })
+vim.keymap.set("n", "<A-Up>", ":resize +1<CR>", { silent = true })
+vim.keymap.set("n", "<A-Down>", ":resize -1<CR>", { silent = true })
 
-vim.keymap.set("n", "<A-h>", ":vertical resize -2<CR>", { silent = true })
-vim.keymap.set("n", "<A-l>", ":vertical resize +2<CR>", { silent = true })
-vim.keymap.set("n", "<A-k>", ":resize +2<CR>", { silent = true })
-vim.keymap.set("n", "<A-j>", ":resize -2<CR>", { silent = true })
+vim.keymap.set("n", "<A-h>", ":vertical resize -1<CR>", { silent = true })
+vim.keymap.set("n", "<A-l>", ":vertical resize +1<CR>", { silent = true })
+vim.keymap.set("n", "<A-k>", ":resize +1<CR>", { silent = true })
+vim.keymap.set("n", "<A-j>", ":resize -1<CR>", { silent = true })

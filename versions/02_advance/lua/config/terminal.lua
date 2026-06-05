@@ -542,6 +542,49 @@ local function target_window(terminal)
     return current
 end
 
+local function terminal_owner_window(buf)
+    for _, win in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
+        if win_var(win, "terminal_buf") == buf then
+            return win
+        end
+    end
+
+    return nil
+end
+
+local function clear_window_terminal(win)
+    if valid_window(win) then
+        pcall(vim.api.nvim_win_del_var, win, "terminal_buf")
+    end
+end
+
+local function set_window_terminal(win, buf)
+    if valid_window(win) and valid_buffer(buf) then
+        vim.api.nvim_win_set_var(win, "terminal_buf", buf)
+    end
+end
+
+local function fallback_buffer_for_terminal(buf)
+    local previous_buf = vim.b[buf].terminal_previous_buf
+
+    if valid_buffer(previous_buf) and previous_buf ~= buf then
+        return previous_buf
+    end
+
+    return vim.api.nvim_create_buf(true, false)
+end
+
+local function replace_visible_terminal(win, old_buf, new_buf)
+    if
+        valid_window(win)
+        and valid_buffer(old_buf)
+        and valid_buffer(new_buf)
+        and vim.api.nvim_win_get_buf(win) == old_buf
+    then
+        vim.api.nvim_win_set_buf(win, new_buf)
+    end
+end
+
 function M.show_terminal(index)
     local terminal = M.terminals()[index]
 
@@ -725,6 +768,102 @@ local function keep_selected_only(prompt_bufnr)
     refresh_tree()
 end
 
+local function move_selected(prompt_bufnr)
+    local selected = selected_terminal(prompt_bufnr)
+
+    if not selected then
+        return
+    end
+
+    close_picker(prompt_bufnr)
+
+    vim.schedule(function()
+        local ok_picker, window_picker = pcall(require, "config.window_picker")
+
+        if not ok_picker then
+            return
+        end
+
+        local target_win = window_picker.pick_window({
+            filetype = {
+                "NvimTree",
+                "notify",
+            },
+        })
+
+        if not target_win or target_win == -1 then
+            return
+        end
+
+        M.move_terminal_to_window(selected, target_win)
+    end)
+end
+
+function M.move_terminal_to_window(terminal, target_win)
+    if not terminal or not valid_buffer(terminal.buf) then
+        return false
+    end
+
+    if not valid_window(target_win) then
+        return false
+    end
+
+    if M.is_float_terminal(terminal.buf) then
+        M.show_float_terminal(terminal.buf)
+        return true
+    end
+
+    if not M.is_ex_terminal(terminal.buf) then
+        local ok_buffers, buffers = pcall(require, "config.buffers")
+
+        if not ok_buffers then
+            return false
+        end
+
+        return buffers.move_buffer_to_window(terminal.buf, target_win)
+    end
+
+    local source_win = terminal_owner_window(terminal.buf)
+    local target_terminal = win_var(target_win, "terminal_buf")
+    local target_buf = vim.api.nvim_win_get_buf(target_win)
+
+    if source_win == target_win then
+        vim.api.nvim_win_set_buf(target_win, terminal.buf)
+        return true
+    end
+
+    if M.is_ex_terminal(target_terminal) then
+        if valid_window(source_win) then
+            set_window_terminal(source_win, target_terminal)
+            vim.b[target_terminal].terminal_previous_buf = fallback_buffer_for_terminal(terminal.buf)
+            replace_visible_terminal(source_win, terminal.buf, target_terminal)
+        end
+
+        set_window_terminal(target_win, terminal.buf)
+        vim.b[terminal.buf].terminal_previous_buf = target_buf
+        vim.api.nvim_win_set_buf(target_win, terminal.buf)
+        refresh_tree()
+        return true
+    end
+
+    if valid_window(source_win) then
+        clear_window_terminal(source_win)
+        replace_visible_terminal(
+            source_win,
+            terminal.buf,
+            fallback_buffer_for_terminal(terminal.buf)
+        )
+    end
+
+    set_window_terminal(target_win, terminal.buf)
+    vim.b[terminal.buf].terminal_previous_buf = target_buf
+    vim.api.nvim_win_set_buf(target_win, terminal.buf)
+    stop_terminal_insert()
+    refresh_tree()
+
+    return true
+end
+
 local function terminal_display(terminal)
     local state = terminal.visible and "visible" or "hidden"
 
@@ -780,7 +919,7 @@ function M.pick_terminal()
     pickers.new({
         initial_mode = "normal",
         prompt_title = "Terminals",
-        results_title = "Enter open | D terminate process | O keep only | actions ask Enter",
+        results_title = "Enter open | m move | D terminate process | O keep only | actions ask Enter",
     }, {
         finder = finders.new_table({
             results = terminals,
@@ -815,12 +954,23 @@ function M.pick_terminal()
                 keep_selected_only(prompt_bufnr)
             end)
 
+            map("n", "m", function()
+                move_selected(prompt_bufnr)
+            end)
+
             return true
         end,
     }):find()
 end
 
 function M.kill_current_terminal(force)
+    local opts = {}
+
+    if type(force) == "table" then
+        opts = force
+        force = opts.force
+    end
+
     local current_buf = vim.api.nvim_get_current_buf()
 
     if vim.bo[current_buf].buftype ~= "terminal" then
@@ -851,7 +1001,9 @@ function M.kill_current_terminal(force)
         pcall(vim.fn.jobstop, job_id)
     end
 
-    vim.cmd("enew")
+    if opts.replace ~= false then
+        vim.cmd("enew")
+    end
 
     if valid_buffer(current_buf) then
         pcall(vim.api.nvim_buf_delete, current_buf, { force = force or was_running })

@@ -3,6 +3,60 @@ local M = {}
 local picker_chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890"
 local focus_picker_chars = "ABCDEFGHIJKLMNOPQRSUVWXYZ1234567890"
 local active_picker = nil
+local next_window_order = 1
+
+local function window_order(win)
+    if not vim.api.nvim_win_is_valid(win) then
+        return nil
+    end
+
+    local ok, order = pcall(vim.api.nvim_win_get_var, win, "window_picker_order")
+
+    if ok and type(order) == "number" then
+        return order
+    end
+
+    order = next_window_order
+    next_window_order = next_window_order + 1
+    vim.api.nvim_win_set_var(win, "window_picker_order", order)
+
+    return order
+end
+
+local function existing_window_order(win)
+    local ok, order = pcall(vim.api.nvim_win_get_var, win, "window_picker_order")
+
+    if ok and type(order) == "number" then
+        return order
+    end
+
+    return nil
+end
+
+local function sort_by_window_order(windows)
+    table.sort(windows, function(a, b)
+        local a_order = existing_window_order(a)
+        local b_order = existing_window_order(b)
+
+        if a_order and b_order then
+            return a_order < b_order
+        end
+
+        if a_order then
+            return true
+        end
+
+        if b_order then
+            return false
+        end
+
+        return a < b
+    end)
+
+    for _, win in ipairs(windows) do
+        window_order(win)
+    end
+end
 
 local function is_excluded(win, exclude)
     if not vim.api.nvim_win_is_valid(win) then
@@ -39,10 +93,16 @@ function M.selectable_windows(exclude)
         end
     end
 
+    sort_by_window_order(windows)
+
     return windows
 end
 
 function M.label_for_window(win, exclude)
+    if is_excluded(win, exclude) then
+        return ""
+    end
+
     local index = 1
 
     for _, candidate in ipairs(M.selectable_windows(exclude)) do
@@ -54,6 +114,28 @@ function M.label_for_window(win, exclude)
     end
 
     return ""
+end
+
+function M.refresh_window_orders()
+    M.selectable_windows({
+        filetype = {
+            "NvimTree",
+            "notify",
+        },
+    })
+end
+
+function M.remember_window(win)
+    win = win or vim.api.nvim_get_current_win()
+
+    if not is_excluded(win, {
+        filetype = {
+            "NvimTree",
+            "notify",
+        },
+    }) then
+        window_order(win)
+    end
 end
 
 function M.focus_statusline_window()
@@ -289,6 +371,7 @@ function M.focus_window()
     vim.opt.fillchars = fillchars
     fillchars.stl = old_stl
     fillchars.stlnc = old_stlnc
+    sort_by_window_order(windows)
 
     for _, win in ipairs(windows) do
         local buf = vim.api.nvim_win_get_buf(win)

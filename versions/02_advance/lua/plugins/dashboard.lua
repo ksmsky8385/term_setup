@@ -243,6 +243,17 @@ return {
                 return true
             end
 
+            local is_empty_unnamed_buffer = vim.api.nvim_buf_is_valid(buf)
+                and vim.api.nvim_buf_get_name(buf) == ""
+                and vim.bo[buf].buftype == ""
+                and not vim.bo[buf].modified
+                and vim.api.nvim_buf_line_count(buf) == 1
+                and vim.api.nvim_buf_get_lines(buf, 0, 1, false)[1] == ""
+
+            if is_empty_unnamed_buffer then
+                return false
+            end
+
             return vim.api.nvim_buf_is_valid(buf)
                 and vim.bo[buf].buflisted
                 and vim.bo[buf].filetype ~= "alpha"
@@ -253,6 +264,23 @@ return {
         local function is_dashboard_buffer(buf)
             return vim.api.nvim_buf_is_valid(buf)
                 and vim.bo[buf].filetype == "alpha"
+        end
+
+        local function regular_window_count()
+            local count = 0
+
+            for _, win in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
+                if vim.api.nvim_win_is_valid(win) then
+                    local buf = vim.api.nvim_win_get_buf(win)
+                    local filetype = vim.bo[buf].filetype
+
+                    if filetype ~= "NvimTree" and filetype ~= "notify" then
+                        count = count + 1
+                    end
+                end
+            end
+
+            return count
         end
 
         local function remember_current_buffer()
@@ -269,7 +297,32 @@ return {
                 return true
             end
 
+            local ok_terminal, terminal = pcall(require, "config.terminal")
+            local ok_toggle, terminal_buf = pcall(vim.api.nvim_win_get_var, 0, "terminal_buf")
+
+            if
+                ok_terminal
+                and ok_toggle
+                and terminal.is_ex_terminal(terminal_buf)
+            then
+                vim.api.nvim_win_set_buf(0, terminal_buf)
+                return true
+            end
+
             return false
+        end
+
+        local function close_dashboard_or_quit()
+            if return_to_previous_buffer() then
+                return
+            end
+
+            if regular_window_count() > 1 then
+                vim.cmd("quit")
+                return
+            end
+
+            vim.cmd("DashboardQuit")
         end
 
         dashboard.section.header.val = make_header()
@@ -306,6 +359,8 @@ return {
                 vim.keymap.set("n", "<Up>", function()
                     move_dashboard_cursor(-1)
                 end, opts)
+
+                vim.keymap.set("n", "<leader>q", close_dashboard_or_quit, opts)
             end,
         })
 
