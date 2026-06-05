@@ -46,6 +46,7 @@ local terminal = require("config.terminal")
 local window_picker = require("config.window_picker")
 
 local ignored_quit_filetypes = {
+    FloatingTerminal = true,
     NvimTree = true,
     alpha = true,
     notify = true,
@@ -105,12 +106,6 @@ local function terminal_job_running(buf)
     return type(job_id) == "number" and vim.fn.jobwait({ job_id }, 0)[1] == -1
 end
 
-local function has_window_toggle_terminal(win)
-    local ok, terminal_buf = pcall(vim.api.nvim_win_get_var, win, "terminal_buf")
-
-    return ok and terminal.is_ex_terminal(terminal_buf)
-end
-
 local function close_blocker(buf, force)
     if not vim.api.nvim_buf_is_valid(buf) then
         return nil
@@ -148,7 +143,7 @@ local function leader_quit(force)
     local current_buf = vim.api.nvim_get_current_buf()
 
     if force and vim.bo[current_buf].buftype == "terminal" then
-        if has_window_toggle_terminal(current_win) then
+        if terminal.is_float_terminal(current_buf) then
             terminal.kill_current_terminal(force)
             return
         end
@@ -181,13 +176,6 @@ local function leader_quit(force)
 
     if buffer_visible_in_other_window(current_buf, current_win) then
         close_current_window_or_dashboard(current_win)
-        return
-    end
-
-    if has_window_toggle_terminal(current_win) then
-        local ok, terminal_buf = pcall(vim.api.nvim_win_get_var, current_win, "terminal_buf")
-
-        buffers.delete_current_to_hidden_or_empty(force, ok and terminal_buf or nil)
         return
     end
 
@@ -228,25 +216,29 @@ end, {
     desc = "Open dashboard in current window",
 })
 
-vim.keymap.set("n", "<leader>t", terminal.toggle_window_terminal, {
-    noremap = true,
-    silent = true,
-    desc = "Toggle terminal in current window",
-})
-
-vim.keymap.set("n", "<leader><C-t>", terminal.pick_terminal, {
-    noremap = true,
-    silent = true,
-    desc = "Pick running terminal",
-})
-
-vim.keymap.set("n", "<leader>T", terminal.create_buffer_terminal, {
+vim.keymap.set("n", "<leader>tt", terminal.create_buffer_terminal, {
     noremap = true,
     silent = true,
     desc = "Create buffer terminal",
 })
 
-vim.keymap.set({ "n", "t" }, "<leader>`", terminal.open_float_terminal, {
+vim.keymap.set("n", "<leader>ts", function()
+    terminal.create_buffer_terminal_split("rightbelow split")
+end, {
+    noremap = true,
+    silent = true,
+    desc = "Create buffer terminal in horizontal split",
+})
+
+vim.keymap.set("n", "<leader>tv", function()
+    terminal.create_buffer_terminal_split("rightbelow vsplit")
+end, {
+    noremap = true,
+    silent = true,
+    desc = "Create buffer terminal in vertical split",
+})
+
+vim.keymap.set("n", "<leader>`", terminal.open_float_terminal, {
     noremap = true,
     silent = true,
     desc = "Toggle floating terminal",

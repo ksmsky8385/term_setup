@@ -96,10 +96,20 @@ return {
                 end
             end
 
-            local ok_terminal, terminal = pcall(require, "config.terminal")
+            for _, buf in ipairs(vim.api.nvim_list_bufs()) do
+                if
+                    vim.api.nvim_buf_is_valid(buf)
+                    and vim.bo[buf].buftype == "terminal"
+                then
+                    local job_id = vim.b[buf].terminal_job_id
 
-            if ok_terminal and #terminal.terminals() > 0 then
-                return "Running terminals remain. Close them from Space Ctrl-t before quitting."
+                    if
+                        type(job_id) == "number"
+                        and vim.fn.jobwait({ job_id }, 0)[1] == -1
+                    then
+                        return "Running terminals remain. Close them from Space bb or :TKill before quitting."
+                    end
+                end
             end
 
             return nil
@@ -237,12 +247,6 @@ return {
         end
 
         local function is_returnable_buffer(buf)
-            local ok_terminal, terminal = pcall(require, "config.terminal")
-
-            if ok_terminal and terminal.is_ex_terminal(buf) then
-                return true
-            end
-
             local is_empty_unnamed_buffer = vim.api.nvim_buf_is_valid(buf)
                 and vim.api.nvim_buf_get_name(buf) == ""
                 and vim.bo[buf].buftype == ""
@@ -256,6 +260,7 @@ return {
 
             return vim.api.nvim_buf_is_valid(buf)
                 and vim.bo[buf].buflisted
+                and vim.bo[buf].filetype ~= "FloatingTerminal"
                 and vim.bo[buf].filetype ~= "alpha"
                 and vim.bo[buf].filetype ~= "NvimTree"
                 and vim.bo[buf].filetype ~= "notify"
@@ -274,7 +279,11 @@ return {
                     local buf = vim.api.nvim_win_get_buf(win)
                     local filetype = vim.bo[buf].filetype
 
-                    if filetype ~= "NvimTree" and filetype ~= "notify" then
+                    if
+                        filetype ~= "FloatingTerminal"
+                        and filetype ~= "NvimTree"
+                        and filetype ~= "notify"
+                    then
                         count = count + 1
                     end
                 end
@@ -294,18 +303,6 @@ return {
         local function return_to_previous_buffer()
             if previous_buf and is_returnable_buffer(previous_buf) then
                 vim.api.nvim_win_set_buf(0, previous_buf)
-                return true
-            end
-
-            local ok_terminal, terminal = pcall(require, "config.terminal")
-            local ok_toggle, terminal_buf = pcall(vim.api.nvim_win_get_var, 0, "terminal_buf")
-
-            if
-                ok_terminal
-                and ok_toggle
-                and terminal.is_ex_terminal(terminal_buf)
-            then
-                vim.api.nvim_win_set_buf(0, terminal_buf)
                 return true
             end
 

@@ -6,7 +6,6 @@ return {
 
     config = function()
         local buffers = require("config.buffers")
-        local terminal = require("config.terminal")
         local window_picker = require("config.window_picker")
         local api = require("nvim-tree.api")
         local preview_win
@@ -98,6 +97,7 @@ return {
 
             for _, win in ipairs(window_picker.selectable_windows({
                 filetype = {
+                    "FloatingTerminal",
                     "NvimTree",
                     "notify",
                 },
@@ -320,20 +320,6 @@ return {
                         desc = desc,
                     }
                 end
-
-                vim.keymap.set(
-                    "n",
-                    "<leader>t",
-                    terminal.pick_terminal,
-                    opts("Pick terminal")
-                )
-
-                vim.keymap.set(
-                    "n",
-                    "<leader>T",
-                    terminal.create_buffer_terminal,
-                    opts("Create buffer terminal")
-                )
 
                 vim.keymap.set(
                     "n",

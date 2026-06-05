@@ -30,6 +30,7 @@ end
 
 local hidden_replacement_buffer
 local movable_buffer
+local buffer_terminal_kind
 
 local function terminal_job_running(buf)
     local job_id = vim.b[buf].terminal_job_id
@@ -105,6 +106,7 @@ local function window_labels_by_buffer()
         filetype = {
             "NvimTree",
             "notify",
+            "FloatingTerminal",
         },
     }
 
@@ -130,6 +132,17 @@ local function window_labels_by_buffer()
         max_width = math.max(max_width, #labels[buf])
     end
 
+    local ok_terminal, terminal = pcall(require, "config.terminal")
+
+    if ok_terminal then
+        for _, buf in ipairs(listed_buffers()) do
+            if terminal.is_float_terminal(buf) then
+                labels[buf] = "Floating"
+                max_width = math.max(max_width, #labels[buf])
+            end
+        end
+    end
+
     return labels, max_width
 end
 
@@ -141,7 +154,13 @@ local function buffer_entry_maker(opts)
     return function(entry)
         local made = base_maker(entry)
 
-        if not made or label_width == 0 then
+        if not made then
+            return made
+        end
+
+        made.sort_score = entry.sort_score
+
+        if label_width == 0 then
             return made
         end
 
@@ -184,6 +203,28 @@ local function buffer_entry_maker(opts)
 
         return made
     end
+end
+
+local function buffer_sorter(opts)
+    local sorters = require("telescope.sorters")
+    local generic = require("telescope.config").values.generic_sorter(opts)
+
+    return sorters.Sorter:new({
+        scoring_function = function(_, prompt, line, entry, cb_add, cb_filter)
+            if prompt == "" then
+                return entry.sort_score or 1
+            end
+
+            return generic:scoring_function(prompt, line, entry, cb_add, cb_filter)
+        end,
+        highlighter = function(_, prompt, display)
+            if generic.highlighter then
+                return generic:highlighter(prompt, display)
+            end
+
+            return {}
+        end,
+    })
 end
 
 local function selected_buffer(prompt_bufnr)
@@ -258,15 +299,11 @@ local function visible_window_count(buf)
     return #visible_windows_for_buffer(buf)
 end
 
-local function buffer_terminal_kind(buf)
+buffer_terminal_kind = function(buf)
     local ok_terminal, terminal = pcall(require, "config.terminal")
 
     if not ok_terminal then
         return nil
-    end
-
-    if terminal.is_ex_terminal(buf) then
-        return "toggle"
     end
 
     if terminal.is_float_terminal(buf) then
@@ -357,18 +394,79 @@ local function window_for_buffer(buf)
     return visible_windows_for_buffer(buf)[1]
 end
 
-local function fallback_buffer_for_displaced(buf)
-    local ok_terminal, terminal = pcall(require, "config.terminal")
+local function first_selectable_window_for_buffer(buf)
+    local ok_picker, window_picker = pcall(require, "config.window_picker")
+    local exclude = {
+        filetype = {
+            "NvimTree",
+            "notify",
+            "FloatingTerminal",
+        },
+    }
 
-    if ok_terminal and terminal.is_ex_terminal(buf) then
-        local previous_buf = vim.b[buf].terminal_previous_buf
-
-        if vim.api.nvim_buf_is_valid(previous_buf) and previous_buf ~= buf then
-            return previous_buf
+    if ok_picker then
+        for _, win in ipairs(window_picker.selectable_windows(exclude)) do
+            if vim.api.nvim_win_get_buf(win) == buf then
+                return win
+            end
         end
     end
 
+    return window_for_buffer(buf)
+end
+
+local function fallback_buffer_for_displaced(buf)
     return vim.api.nvim_create_buf(true, false)
+end
+
+local function open_selected(prompt_bufnr)
+    local buf = selected_buffer(prompt_bufnr)
+
+    if not buf then
+        return
+    end
+
+    local existing_win = first_selectable_window_for_buffer(buf)
+
+    close_picker(prompt_bufnr)
+
+    local ok_terminal, terminal = pcall(require, "config.terminal")
+
+    if ok_terminal and terminal.is_float_terminal(buf) then
+        terminal.show_float_terminal(buf)
+        return
+    end
+
+    if existing_win and vim.api.nvim_win_is_valid(existing_win) then
+        vim.api.nvim_set_current_win(existing_win)
+        return
+    end
+
+    vim.schedule(function()
+        local ok_picker, window_picker = pcall(require, "config.window_picker")
+
+        if not ok_picker then
+            vim.api.nvim_win_set_buf(0, buf)
+            return
+        end
+
+        local target_win = window_picker.pick_window({
+            filetype = {
+                "NvimTree",
+                "notify",
+                "FloatingTerminal",
+            },
+        })
+
+        if not target_win or target_win == -1 then
+            M.pick()
+            return
+        end
+
+        if M.move_buffer_to_window(buf, target_win) then
+            vim.api.nvim_set_current_win(target_win)
+        end
+    end)
 end
 
 local function delete_selected(prompt_bufnr, force)
@@ -495,6 +593,7 @@ local function move_selected(prompt_bufnr)
             filetype = {
                 "NvimTree",
                 "notify",
+                "FloatingTerminal",
             },
         })
 
@@ -526,6 +625,7 @@ local function copy_selected(prompt_bufnr)
             filetype = {
                 "NvimTree",
                 "notify",
+                "FloatingTerminal",
             },
         })
 
@@ -552,7 +652,14 @@ local function buffer_picker()
     end
 
     table.sort(bufnrs, function(a, b)
-        return vim.fn.getbufinfo(a)[1].lastused > vim.fn.getbufinfo(b)[1].lastused
+        local a_float = buffer_terminal_kind(a) == "float"
+        local b_float = buffer_terminal_kind(b) == "float"
+
+        if a_float ~= b_float then
+            return a_float
+        end
+
+        return a < b
     end)
 
     local buffers = {}
@@ -564,24 +671,33 @@ local function buffer_picker()
         ignore_current_buffer = false,
     }
 
-    for _, buf in ipairs(bufnrs) do
+    for index, buf in ipairs(bufnrs) do
         table.insert(buffers, {
             bufnr = buf,
             flag = buf == vim.fn.bufnr("") and "%" or (buf == vim.fn.bufnr("#") and "#" or " "),
             info = vim.fn.getbufinfo(buf)[1],
+            sort_score = #bufnrs - index + 1,
         })
     end
 
     pickers.new(opts, {
         prompt_title = "Buffers",
-        results_title = "Enter open | m move | y copy | d/D delete | o/O keep only | destructive actions ask Enter",
+        results_title = "Enter open | m move | y copy | d/D delete | o/O keep only",
         finder = finders.new_table({
             results = buffers,
             entry_maker = buffer_entry_maker(opts),
         }),
         previewer = conf.grep_previewer(opts),
-        sorter = conf.generic_sorter(opts),
+        sorter = buffer_sorter(opts),
         attach_mappings = function(prompt_bufnr, map)
+            map("i", "<CR>", function()
+                open_selected(prompt_bufnr)
+            end)
+
+            map("n", "<CR>", function()
+                open_selected(prompt_bufnr)
+            end)
+
             map("n", "d", function()
                 delete_selected(prompt_bufnr, false)
             end)
