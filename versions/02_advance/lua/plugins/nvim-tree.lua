@@ -236,6 +236,13 @@ return {
 
                 vim.keymap.set(
                     "n",
+                    "<leader>T",
+                    terminal.create_buffer_terminal,
+                    opts("Create buffer terminal")
+                )
+
+                vim.keymap.set(
+                    "n",
                     "<Tab>",
                     open_preview,
                     opts("Preview file")

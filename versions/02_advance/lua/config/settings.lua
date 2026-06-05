@@ -2,6 +2,21 @@ local themes = require("config.themes")
 
 local M = {}
 
+local recommended_treesitter_langs = {
+    "c",
+    "python",
+    "lua",
+    "bash",
+    "make",
+    "json",
+    "yaml",
+    "toml",
+    "markdown",
+    "markdown_inline",
+    "vim",
+    "vimdoc",
+}
+
 local function current_theme()
     return vim.g.colors_name or themes.default
 end
@@ -204,19 +219,45 @@ local function open_treesitter_install()
     end
 
     local parser_list = parsers.available_parsers()
+    local configured = {}
+    local max_lang_len = 0
 
     table.sort(parser_list)
+
+    for _, lang in ipairs(recommended_treesitter_langs) do
+        configured[lang] = true
+    end
+
+    for _, lang in ipairs(parser_list) do
+        max_lang_len = math.max(max_lang_len, #lang)
+    end
 
     local entries = {
         {
             label = "< Back",
             action = open_treesitter,
         },
+        {
+            label = "[x] installed    [ ] not installed    * recommended",
+        },
     }
 
     for _, lang in ipairs(parser_list) do
+        local installed = #vim.api.nvim_get_runtime_file(
+            "parser/" .. lang .. ".so",
+            false
+        ) > 0
+        local status = installed and "[x]" or "[ ]"
+        local marker = configured[lang] and "*" or " "
+
         table.insert(entries, {
-            label = lang,
+            label = string.format(
+                "%s %s %-" .. max_lang_len .. "s",
+                status,
+                marker,
+                lang
+            ),
+            ordinal = lang,
             action = function()
                 vim.cmd("TSMyInstall " .. vim.fn.fnameescape(lang))
             end,

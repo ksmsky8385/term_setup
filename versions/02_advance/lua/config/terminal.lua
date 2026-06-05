@@ -1,6 +1,7 @@
 local M = {}
 
 local EX_TERMINAL_KIND = "ex"
+local BUFFER_TERMINAL_KIND = "buffer"
 local FLOAT_TERMINAL_KIND = "float"
 
 local function valid_buffer(buf)
@@ -9,6 +10,19 @@ end
 
 local function job_running(job_id)
     return job_id and vim.fn.jobwait({ job_id }, 0)[1] == -1
+end
+
+local function mark_closing(buf)
+    if not valid_buffer(buf) then
+        return false
+    end
+
+    if vim.b[buf].terminal_closing then
+        return true
+    end
+
+    vim.b[buf].terminal_closing = true
+    return false
 end
 
 local function win_var(win, name)
@@ -27,10 +41,14 @@ end
 
 local function terminal_label(buf)
     if vim.b[buf].terminal_kind == EX_TERMINAL_KIND then
-        return "[EX]"
+        return "[Toggle]"
     end
 
-    return "[-]"
+    if vim.b[buf].terminal_kind == FLOAT_TERMINAL_KIND then
+        return "[Float]"
+    end
+
+    return "[Buffer]"
 end
 
 local function stop_terminal_insert()
@@ -54,6 +72,24 @@ local function floating_terminal_size()
 end
 
 local function window_labels()
+    local ok_picker, window_picker = pcall(require, "config.window_picker")
+
+    if ok_picker then
+        local labels = {}
+        local exclude = {
+            filetype = {
+                "NvimTree",
+                "notify",
+            },
+        }
+
+        for _, win in ipairs(window_picker.selectable_windows(exclude)) do
+            labels[win] = window_picker.label_for_window(win, exclude)
+        end
+
+        return labels
+    end
+
     local labels = {}
     local chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
     local index = 1
@@ -104,7 +140,11 @@ function M.status_label(buf)
     end
 
     if M.is_ex_terminal(buf) then
-        return "[EX]"
+        return "[Toggle]"
+    end
+
+    if vim.bo[buf].buftype == "terminal" then
+        return terminal_label(buf)
     end
 
     return ""
@@ -129,6 +169,11 @@ function M.status_name()
 end
 
 function M.restore_terminal_window(buf)
+    if not valid_buffer(buf) then
+        refresh_tree()
+        return
+    end
+
     local previous_buf = vim.b[buf].terminal_previous_buf
 
     for _, win in ipairs(vim.api.nvim_list_wins()) do
@@ -176,7 +221,39 @@ function M.setup_lifecycle(terminal_buf, terminal_win, job_id)
     })
 end
 
+function M.create_buffer_terminal()
+    if vim.bo.filetype == "NvimTree" then
+        for _, win in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
+            local buf = vim.api.nvim_win_get_buf(win)
+            local filetype = vim.bo[buf].filetype
+
+            if filetype ~= "NvimTree" and filetype ~= "notify" then
+                vim.api.nvim_set_current_win(win)
+                break
+            end
+        end
+    end
+
+    vim.cmd("terminal")
+
+    local terminal_buf = vim.api.nvim_get_current_buf()
+
+    vim.b[terminal_buf].terminal_kind = BUFFER_TERMINAL_KIND
+    vim.b[terminal_buf].terminal_previous_buf = vim.fn.bufnr("#")
+    vim.bo[terminal_buf].buflisted = true
+
+    if vim.b[terminal_buf].terminal_job_id then
+        stop_terminal_insert()
+    end
+
+    refresh_tree()
+end
+
 function M.close_float_terminal(buf, win)
+    if mark_closing(buf) then
+        return
+    end
+
     if win and vim.api.nvim_win_is_valid(win) then
         pcall(vim.api.nvim_win_close, win, true)
     end
@@ -312,15 +389,30 @@ function M.terminals()
 
         seen[buf] = true
 
+        if not vim.b[buf].terminal_kind then
+            vim.b[buf].terminal_kind = BUFFER_TERMINAL_KIND
+        end
+
+        local visible_win = nil
+
+        for _, candidate in ipairs(vim.api.nvim_list_wins()) do
+            if vim.api.nvim_win_get_buf(candidate) == buf then
+                visible_win = candidate
+                break
+            end
+        end
+
+        local display_win = visible_win or win
+
         table.insert(terminals, {
-            win = win,
+            win = display_win,
             buf = buf,
             job = vim.b[buf].terminal_job_id,
             shell = shell_name(),
             previous = previous_name_for(buf),
             label = terminal_label(buf),
-            visible = vim.api.nvim_win_get_buf(win) == buf,
-            window_label = labels[win] or "?",
+            visible = visible_win ~= nil,
+            window_label = display_win and labels[display_win] or "-",
         })
     end
 
@@ -335,21 +427,242 @@ function M.terminals()
         add_terminal(win, visible_buf)
     end
 
+    for _, buf in ipairs(vim.api.nvim_list_bufs()) do
+        add_terminal(nil, buf)
+    end
+
     return terminals
+end
+
+local function target_window(terminal)
+    if terminal.win and vim.api.nvim_win_is_valid(terminal.win) then
+        return terminal.win
+    end
+
+    local current = vim.api.nvim_get_current_win()
+
+    if vim.bo[vim.api.nvim_win_get_buf(current)].filetype ~= "NvimTree" then
+        return current
+    end
+
+    for _, win in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
+        local buf = vim.api.nvim_win_get_buf(win)
+        local filetype = vim.bo[buf].filetype
+
+        if filetype ~= "NvimTree" and filetype ~= "notify" then
+            return win
+        end
+    end
+
+    return current
 end
 
 function M.show_terminal(index)
     local terminal = M.terminals()[index]
 
-    if not terminal or not vim.api.nvim_win_is_valid(terminal.win) then
+    if not terminal then
         vim.notify("No terminal at index " .. index, vim.log.levels.WARN)
         return
     end
 
-    vim.api.nvim_set_current_win(terminal.win)
-    vim.api.nvim_win_set_buf(terminal.win, terminal.buf)
+    local win = target_window(terminal)
+
+    vim.api.nvim_set_current_win(win)
+    vim.api.nvim_win_set_buf(win, terminal.buf)
     stop_terminal_insert()
     refresh_tree()
+end
+
+local function selected_terminal(prompt_bufnr)
+    local ok_state, action_state = pcall(require, "telescope.actions.state")
+
+    if not ok_state then
+        return nil
+    end
+
+    local selection = action_state.get_selected_entry(prompt_bufnr)
+
+    return selection and selection.value or nil
+end
+
+local function close_picker(prompt_bufnr)
+    local ok_actions, actions = pcall(require, "telescope.actions")
+
+    if ok_actions then
+        actions.close(prompt_bufnr)
+    end
+end
+
+local function confirm_action(message)
+    vim.api.nvim_echo({
+        { message .. " Press Enter to confirm, Esc to cancel.", "WarningMsg" },
+    }, false, {})
+
+    local ok, input = pcall(vim.fn.getcharstr)
+
+    vim.cmd("redraw")
+
+    if not ok then
+        return false
+    end
+
+    return input == "\13" or input == "\10" or input == "\r"
+end
+
+local function notify_terminal_error(err)
+    if err then
+        vim.notify(err, vim.log.levels.ERROR)
+    end
+end
+
+local function kill_terminal(terminal, force)
+    if not terminal or not valid_buffer(terminal.buf) then
+        return true
+    end
+
+    local buf = terminal.buf
+    local job_id = vim.b[buf].terminal_job_id
+
+    if M.is_ex_terminal(buf) then
+        if job_running(job_id) then
+            if not force then
+                return false, "Terminal process is still running in buffer " .. buf .. ". Use D/O to force."
+            end
+
+            pcall(vim.fn.jobstop, job_id)
+            return true
+        else
+            M.restore_terminal_window(buf)
+        end
+
+        return true
+    end
+
+    if job_running(job_id) then
+        if not force then
+            return false, "Terminal process is still running in buffer " .. buf .. ". Use D/O to force."
+        end
+
+        pcall(vim.fn.jobstop, job_id)
+    end
+
+    for _, win in ipairs(vim.api.nvim_list_wins()) do
+        if valid_buffer(buf) and vim.api.nvim_win_get_buf(win) == buf then
+            vim.api.nvim_win_set_buf(win, vim.api.nvim_create_buf(true, false))
+        end
+    end
+
+    if valid_buffer(buf) then
+        local ok, err = pcall(vim.api.nvim_buf_delete, buf, { force = true })
+
+        if not ok then
+            return false, "Failed to delete terminal buffer: " .. err
+        end
+    end
+
+    refresh_tree()
+
+    return true
+end
+
+local function kill_selected(prompt_bufnr, force)
+    local terminal = selected_terminal(prompt_bufnr)
+
+    if not terminal then
+        return
+    end
+
+    if
+        not confirm_action(
+            string.format(
+                "%s terminal buffer %d?",
+                force and "Force terminate process in" or "Terminate process in",
+                terminal.buf
+            )
+        )
+    then
+        return
+    end
+
+    local ok, err = kill_terminal(terminal, force)
+
+    if not ok then
+        notify_terminal_error(err)
+        return
+    end
+
+    close_picker(prompt_bufnr)
+    vim.schedule(M.pick_terminal)
+end
+
+local function keep_selected_only(prompt_bufnr, force)
+    local selected = selected_terminal(prompt_bufnr)
+
+    if not selected then
+        return
+    end
+
+    if
+        not confirm_action(
+            string.format(
+                "%s every terminal except buffer %d?",
+                force and "Force terminate process in" or "Terminate process in",
+                selected.buf
+            )
+        )
+    then
+        return
+    end
+
+    for _, terminal in ipairs(M.terminals()) do
+        if terminal.buf ~= selected.buf then
+            local ok, err = kill_terminal(terminal, force)
+
+            if not ok then
+                notify_terminal_error(err)
+                return
+            end
+        end
+    end
+
+    close_picker(prompt_bufnr)
+    local win = target_window(selected)
+
+    vim.api.nvim_set_current_win(win)
+    vim.api.nvim_win_set_buf(win, selected.buf)
+    stop_terminal_insert()
+    refresh_tree()
+end
+
+local function terminal_display(terminal)
+    local state = terminal.visible and "visible" or "hidden"
+
+    return string.format(
+        "[%s] %-3s %-8s %-8s %s",
+        terminal.window_label,
+        terminal.buf,
+        terminal.label,
+        state,
+        terminal.shell
+    )
+end
+
+local function terminal_entry_maker(terminal)
+    local display = terminal_display(terminal)
+
+    return {
+        value = terminal,
+        ordinal = table.concat({
+            terminal.buf,
+            terminal.window_label,
+            terminal.label,
+            terminal.shell,
+            terminal.previous,
+            terminal.visible and "visible" or "hidden",
+        }, " "),
+        display = display,
+        bufnr = terminal.buf,
+    }
 end
 
 function M.pick_terminal()
@@ -360,43 +673,68 @@ function M.pick_terminal()
         return
     end
 
-    local lines = {}
-
-    for idx, terminal in ipairs(terminals) do
-        local state = terminal.visible and "visible" or "hidden"
-        table.insert(
-            lines,
-            string.format(
-                "%d: [%s] %s %s (%s)",
-                idx,
-                terminal.window_label,
-                terminal.label,
-                terminal.shell,
-                state
-            )
-        )
-    end
-
-    table.insert(lines, "Type number and <Enter> (Enter/Space/Esc cancels): ")
-
-    local ok, choice = pcall(vim.fn.input, table.concat(lines, "\n"))
+    local ok = pcall(require, "telescope.pickers")
 
     if not ok then
+        vim.notify("Telescope is not available", vim.log.levels.WARN)
         return
     end
 
-    if choice == "" or choice == " " or string.lower(choice) == "q" then
-        return
-    end
+    local pickers = require("telescope.pickers")
+    local finders = require("telescope.finders")
+    local actions = require("telescope.actions")
+    local action_state = require("telescope.actions.state")
+    local conf = require("telescope.config").values
 
-    local index = tonumber(choice)
+    pickers.new({
+        initial_mode = "normal",
+        prompt_title = "Terminals",
+        results_title = "Enter open | d/D terminate process | o/O keep only | destructive actions ask Enter",
+    }, {
+        finder = finders.new_table({
+            results = terminals,
+            entry_maker = terminal_entry_maker,
+        }),
+        sorter = conf.generic_sorter({}),
+        attach_mappings = function(prompt_bufnr, map)
+            local open_selected = function()
+                local terminal = action_state.get_selected_entry()
 
-    if not index then
-        vim.notify("Invalid terminal number: " .. choice, vim.log.levels.WARN)
-        return
-    end
+                actions.close(prompt_bufnr)
 
-    M.show_terminal(index)
+                if terminal and terminal.value then
+                    local latest = M.terminals()
+
+                    for index, candidate in ipairs(latest) do
+                        if candidate.buf == terminal.value.buf then
+                            M.show_terminal(index)
+                            return
+                        end
+                    end
+                end
+            end
+
+            actions.select_default:replace(open_selected)
+
+            map("n", "d", function()
+                kill_selected(prompt_bufnr, false)
+            end)
+
+            map("n", "D", function()
+                kill_selected(prompt_bufnr, true)
+            end)
+
+            map("n", "o", function()
+                keep_selected_only(prompt_bufnr, false)
+            end)
+
+            map("n", "O", function()
+                keep_selected_only(prompt_bufnr, true)
+            end)
+
+            return true
+        end,
+    }):find()
 end
 
 function M.kill_current_terminal()

@@ -32,7 +32,91 @@ local function only_non_tree_window()
 end
 
 local buffers = require("config.buffers")
+local settings = require("config.settings")
 local window_picker = require("config.window_picker")
+
+local ignored_quit_filetypes = {
+    NvimTree = true,
+    notify = true,
+}
+
+local function is_ignored_quit_window(win)
+    if not vim.api.nvim_win_is_valid(win) then
+        return true
+    end
+
+    local buf = vim.api.nvim_win_get_buf(win)
+
+    return ignored_quit_filetypes[vim.bo[buf].filetype] == true
+end
+
+local function regular_window_count()
+    local count = 0
+
+    for _, win in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
+        if not is_ignored_quit_window(win) then
+            count = count + 1
+        end
+    end
+
+    return count
+end
+
+local function terminal_job_running(buf)
+    local job_id = vim.b[buf].terminal_job_id
+
+    return type(job_id) == "number" and vim.fn.jobwait({ job_id }, 0)[1] == -1
+end
+
+local function close_blocker(buf, force)
+    if not vim.api.nvim_buf_is_valid(buf) then
+        return nil
+    end
+
+    if vim.bo[buf].modified and not force then
+        return "Buffer has unsaved changes. Use Space Q to force."
+    end
+
+    if vim.bo[buf].buftype == "terminal" and terminal_job_running(buf) and not force then
+        return "Terminal process is still running. Use Space Q to force."
+    end
+
+    return nil
+end
+
+local function return_last_window_to_dashboard(force)
+    local old_buf = vim.api.nvim_get_current_buf()
+
+    pcall(vim.cmd, "DashboardHome")
+
+    if
+        vim.api.nvim_buf_is_valid(old_buf)
+        and old_buf ~= vim.api.nvim_get_current_buf()
+        and vim.bo[old_buf].filetype ~= "alpha"
+    then
+        pcall(vim.api.nvim_buf_delete, old_buf, {
+            force = force,
+        })
+    end
+end
+
+local function leader_quit(force)
+    local current_win = vim.api.nvim_get_current_win()
+
+    if is_ignored_quit_window(current_win) or regular_window_count() > 1 then
+        vim.cmd(force and "quit!" or "quit")
+        return
+    end
+
+    local blocker = close_blocker(vim.api.nvim_get_current_buf(), force)
+
+    if blocker then
+        vim.notify(blocker, vim.log.levels.WARN)
+        return
+    end
+
+    return_last_window_to_dashboard(force)
+end
 
 vim.keymap.set("n", "<leader>h", function()
     if is_nvim_tree() then
@@ -52,16 +136,58 @@ vim.keymap.set("n", "<leader>t", require("config.terminal").toggle_window_termin
     desc = "Toggle terminal in current window",
 })
 
-vim.keymap.set("n", "<leader>T", require("config.terminal").pick_terminal, {
+vim.keymap.set("n", "<leader><C-t>", require("config.terminal").pick_terminal, {
     noremap = true,
     silent = true,
     desc = "Pick running terminal",
+})
+
+vim.keymap.set("n", "<leader>T", require("config.terminal").create_buffer_terminal, {
+    noremap = true,
+    silent = true,
+    desc = "Create buffer terminal",
 })
 
 vim.keymap.set("n", "<leader>`", require("config.terminal").open_float_terminal, {
     noremap = true,
     silent = true,
     desc = "Open floating terminal",
+})
+
+vim.keymap.set("n", "<leader><C-q>", ":q<CR>", {
+    noremap = true,
+    silent = true,
+    desc = "Close current window",
+})
+
+vim.keymap.set("t", "<leader><C-q>", "<C-\\><C-n><cmd>q<CR>", {
+    noremap = true,
+    silent = true,
+    desc = "Close current window",
+})
+
+vim.keymap.set("n", "<leader>q", function()
+    leader_quit(false)
+end, {
+    noremap = true,
+    silent = true,
+    desc = "Close current window",
+})
+
+vim.keymap.set("n", "<leader>Q", function()
+    leader_quit(true)
+end, {
+    noremap = true,
+    silent = true,
+    desc = "Force close current window",
+})
+
+vim.keymap.set("n", "<leader><C-s>", function()
+    settings.open()
+end, {
+    noremap = true,
+    silent = true,
+    desc = "Open settings",
 })
 
 vim.keymap.set("n", "<leader>bb", buffers.pick, {
@@ -142,16 +268,10 @@ vim.keymap.set("n", "<leader>wo", only_non_tree_window, {
     desc = "Close other windows",
 })
 
-vim.keymap.set("n", "<leader>wc", ":q<CR>", {
+vim.keymap.set("n", "<leader>wq", ":q<CR>", {
     noremap = true,
     silent = true,
     desc = "Close current window",
-})
-
-vim.keymap.set("n", "<leader>sq", ":close<CR>", {
-    noremap = true,
-    silent = true,
-    desc = "Close split",
 })
 
 vim.keymap.set("n", "<C-h>", "<C-w>h", { noremap = true, silent = true })
@@ -168,3 +288,8 @@ vim.keymap.set("n", "<A-Left>", ":vertical resize -2<CR>", { silent = true })
 vim.keymap.set("n", "<A-Right>", ":vertical resize +2<CR>", { silent = true })
 vim.keymap.set("n", "<A-Up>", ":resize +2<CR>", { silent = true })
 vim.keymap.set("n", "<A-Down>", ":resize -2<CR>", { silent = true })
+
+vim.keymap.set("n", "<A-h>", ":vertical resize -2<CR>", { silent = true })
+vim.keymap.set("n", "<A-l>", ":vertical resize +2<CR>", { silent = true })
+vim.keymap.set("n", "<A-k>", ":resize +2<CR>", { silent = true })
+vim.keymap.set("n", "<A-j>", ":resize -2<CR>", { silent = true })

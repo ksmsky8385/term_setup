@@ -8,7 +8,7 @@ return {
     config = function()
         local alpha = require("alpha")
         local dashboard = require("alpha.themes.dashboard")
-        local previous_file_buf = nil
+        local previous_buf = nil
 
         local version = vim.version()
         local version_text = string.format(
@@ -77,15 +77,48 @@ return {
             return header
         end
 
+        local function confirm_quit()
+            vim.api.nvim_echo({
+                { "Quit Neovim? Press Enter to confirm, Esc or any other key to cancel.", "WarningMsg" },
+            }, false, {})
+
+            local ok, input = pcall(vim.fn.getcharstr)
+
+            vim.cmd("redraw")
+
+            if not ok then
+                return
+            end
+
+            if input == "\13" or input == "\10" or input == "\r" then
+                vim.cmd("qa!")
+            end
+        end
+
+        vim.api.nvim_create_user_command("DashboardQuit", confirm_quit, {})
+
         local dashboard_buttons = {
             dashboard.button("e", "   New file", ":ene <BAR> startinsert<CR>"),
-            dashboard.button("f", "   Find file", ":Telescope find_files<CR>"),
-            dashboard.button("g", "󰊄   Search text", ":Telescope live_grep<CR>"),
-            dashboard.button("w", "   Change workspace", ":WorkspacePick<CR>"),
-            dashboard.button("t", "   Toggle tree", ":TreeToggle<CR>"),
+            dashboard.button("f", "󰈞   Find file", ":Telescope find_files<CR>"),
+            dashboard.button("g", "󱎸   Search text", ":Telescope live_grep<CR>"),
+            dashboard.button("w", "󰉋   Change workspace", ":WorkspacePick<CR>"),
+            dashboard.button("t", "󰙅   Toggle tree", ":TreeToggle<CR>"),
             dashboard.button("s", "   Settings", ":Settings<CR>"),
             dashboard.button("a", "   About Neovim", ":AboutNeovim<CR>"),
+            dashboard.button("q", "   Quit Neovim", ":DashboardQuit<CR>"),
         }
+
+        local function dashboard_shortcut(button)
+            return button
+                and button.opts
+                and type(button.opts.shortcut) == "string"
+                and button.opts.shortcut:gsub("%s+", "")
+                or nil
+        end
+
+        local function has_exact_leader_mapping(key)
+            return vim.fn.maparg("<leader>" .. key, "n") ~= ""
+        end
 
         local function dashboard_button_rows()
             local rows = {}
@@ -154,10 +187,18 @@ return {
             alpha.move_cursor(vim.api.nvim_get_current_win())
         end
 
-        local function is_file_buffer(buf)
+        local function is_returnable_buffer(buf)
+            local ok_terminal, terminal = pcall(require, "config.terminal")
+
+            if ok_terminal and terminal.is_ex_terminal(buf) then
+                return true
+            end
+
             return vim.api.nvim_buf_is_valid(buf)
-                and vim.bo[buf].buftype == ""
                 and vim.bo[buf].buflisted
+                and vim.bo[buf].filetype ~= "alpha"
+                and vim.bo[buf].filetype ~= "NvimTree"
+                and vim.bo[buf].filetype ~= "notify"
         end
 
         local function is_dashboard_buffer(buf)
@@ -165,17 +206,17 @@ return {
                 and vim.bo[buf].filetype == "alpha"
         end
 
-        local function remember_current_file()
+        local function remember_current_buffer()
             local buf = vim.api.nvim_get_current_buf()
 
-            if is_file_buffer(buf) then
-                previous_file_buf = buf
+            if is_returnable_buffer(buf) then
+                previous_buf = buf
             end
         end
 
-        local function return_to_previous_file()
-            if previous_file_buf and is_file_buffer(previous_file_buf) then
-                vim.api.nvim_win_set_buf(0, previous_file_buf)
+        local function return_to_previous_buffer()
+            if previous_buf and is_returnable_buffer(previous_buf) then
+                vim.api.nvim_win_set_buf(0, previous_buf)
                 return true
             end
 
@@ -196,6 +237,14 @@ return {
                     silent = true,
                 }
 
+                for _, button in ipairs(dashboard_buttons) do
+                    local key = dashboard_shortcut(button)
+
+                    if key and key ~= "" and not has_exact_leader_mapping(key) then
+                        vim.keymap.set("n", "<leader>" .. key, "<Nop>", opts)
+                    end
+                end
+
                 vim.keymap.set("n", "j", function()
                     move_dashboard_cursor(1)
                 end, opts)
@@ -213,11 +262,11 @@ return {
 
         vim.api.nvim_create_user_command("DashboardHome", function()
             if is_dashboard_buffer(vim.api.nvim_get_current_buf()) then
-                if return_to_previous_file() then
+                if return_to_previous_buffer() then
                     return
                 end
             else
-                remember_current_file()
+                remember_current_buffer()
             end
 
             dashboard.section.header.val = make_header()

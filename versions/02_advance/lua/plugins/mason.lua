@@ -331,7 +331,7 @@ return {
                         })
                     end
 
-                    if #entries == 0 then
+                    if #servers == 0 then
                         vim.notify("No installed LSP servers")
                         return
                     end
