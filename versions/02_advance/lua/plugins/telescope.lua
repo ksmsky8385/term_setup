@@ -6,6 +6,7 @@ return {
 
     config = function()
         local telescope = require("telescope")
+        local actions = require("telescope.actions")
         local builtin = require("telescope.builtin")
 
         local function is_nvim_tree()
@@ -52,7 +53,20 @@ return {
             })
         end
 
-        telescope.setup({})
+        telescope.setup({
+            defaults = {
+                mappings = {
+                    i = {
+                        ["<Esc>"] = function()
+                            vim.cmd("stopinsert")
+                        end,
+                    },
+                    n = {
+                        ["<Esc>"] = actions.close,
+                    },
+                },
+            },
+        })
 
         vim.keymap.set("n", "<leader>ff", builtin.find_files, {
             desc = "Find files",

@@ -5,6 +5,47 @@ local focus_picker_chars = "ABCDEFGHIJKLMNOPQRSUVWXYZ1234567890"
 local active_picker = nil
 local next_window_order = 1
 
+local function hl(name)
+    local ok, value = pcall(vim.api.nvim_get_hl, 0, {
+        name = name,
+        link = false,
+    })
+
+    if ok and type(value) == "table" then
+        return value
+    end
+
+    return {}
+end
+
+local function first_color(key, names, fallback)
+    for _, name in ipairs(names) do
+        local value = hl(name)[key]
+
+        if value then
+            return value
+        end
+    end
+
+    return fallback
+end
+
+local function apply_highlights()
+    vim.api.nvim_set_hl(0, "NvimTreeWindowPicker", {
+        fg = first_color("fg", { "StatusLine", "TabLineSel", "Normal" }, 0xffffff),
+        bg = first_color("fg", { "Type" }, 0x569cd6),
+        bold = true,
+    })
+end
+
+function M.setup()
+    apply_highlights()
+
+    vim.api.nvim_create_autocmd("ColorScheme", {
+        callback = apply_highlights,
+    })
+end
+
 local function window_order(win)
     if not vim.api.nvim_win_is_valid(win) then
         return nil

@@ -98,10 +98,11 @@ local function delete_buffer(buf, force)
     return true
 end
 
-local function window_labels_by_buffer()
+local function visible_tab_labels_by_buffer()
     local ok_picker, window_picker = pcall(require, "config.window_picker")
     local labels = {}
     local max_width = 0
+    local show_tab_label = vim.fn.tabpagenr("$") > 1
     local exclude = {
         filetype = {
             "NvimTree",
@@ -114,21 +115,41 @@ local function window_labels_by_buffer()
         return labels, max_width
     end
 
-    for _, win in ipairs(window_picker.selectable_windows(exclude)) do
-        local buf = vim.api.nvim_win_get_buf(win)
+    for tabnr, tabpage in ipairs(vim.api.nvim_list_tabpages()) do
+        local tab_labels = {}
+        local previous_tabpage = vim.api.nvim_get_current_tabpage()
 
-        if valid_listed_buffer(buf) then
-            local label = window_picker.label_for_window(win, exclude)
+        vim.api.nvim_set_current_tabpage(tabpage)
 
-            if label ~= "" then
-                labels[buf] = labels[buf] or {}
-                table.insert(labels[buf], label)
+        for _, win in ipairs(window_picker.selectable_windows(exclude)) do
+            local buf = vim.api.nvim_win_get_buf(win)
+            local window_label = window_picker.label_for_window(win, exclude)
+
+            if valid_listed_buffer(buf) and window_label ~= "" then
+                tab_labels[buf] = tab_labels[buf] or {}
+                table.insert(tab_labels[buf], window_label)
             end
+        end
+
+        vim.api.nvim_set_current_tabpage(previous_tabpage)
+
+        for buf, window_labels in pairs(tab_labels) do
+            local tab_label = show_tab_label
+                    and string.format("T%02d", tabnr - 1)
+                or ""
+            local label = "[" .. table.concat(window_labels, ",") .. "]"
+
+            if tab_label ~= "" then
+                label = "[" .. tab_label .. "]" .. label
+            end
+
+            labels[buf] = labels[buf] or {}
+            table.insert(labels[buf], label)
         end
     end
 
     for buf, buf_labels in pairs(labels) do
-        labels[buf] = table.concat(buf_labels, ",")
+        labels[buf] = table.concat(buf_labels, " ")
         max_width = math.max(max_width, #labels[buf])
     end
 
@@ -149,7 +170,7 @@ end
 local function buffer_entry_maker(opts)
     local make_entry = require("telescope.make_entry")
     local base_maker = make_entry.gen_from_buffer(opts)
-    local labels, label_width = window_labels_by_buffer()
+    local labels, label_width = visible_tab_labels_by_buffer()
 
     return function(entry)
         local made = base_maker(entry)
@@ -295,8 +316,30 @@ local function visible_windows_for_buffer(buf)
     return windows
 end
 
+local function all_visible_windows_for_buffer(buf)
+    local windows = {}
+
+    if not vim.api.nvim_buf_is_valid(buf) then
+        return windows
+    end
+
+    for _, tabpage in ipairs(vim.api.nvim_list_tabpages()) do
+        for _, win in ipairs(vim.api.nvim_tabpage_list_wins(tabpage)) do
+            if vim.api.nvim_win_is_valid(win) and vim.api.nvim_win_get_buf(win) == buf then
+                table.insert(windows, win)
+            end
+        end
+    end
+
+    return windows
+end
+
 local function visible_window_count(buf)
     return #visible_windows_for_buffer(buf)
+end
+
+local function all_visible_window_count(buf)
+    return #all_visible_windows_for_buffer(buf)
 end
 
 buffer_terminal_kind = function(buf)
@@ -341,7 +384,7 @@ hidden_replacement_buffer = function(current)
     local candidates = {}
 
     for _, buf in ipairs(listed_buffers()) do
-        if buf ~= current and movable_buffer(buf) and visible_window_count(buf) == 0 then
+        if buf ~= current and movable_buffer(buf) and all_visible_window_count(buf) == 0 then
             table.insert(candidates, buf)
         end
     end
@@ -383,7 +426,7 @@ local function can_delete_unique_window_buffer(buf, force)
         return false
     end
 
-    if visible_window_count(buf) ~= 1 then
+    if all_visible_window_count(buf) ~= 1 then
         return false
     end
 
@@ -392,6 +435,10 @@ end
 
 local function window_for_buffer(buf)
     return visible_windows_for_buffer(buf)[1]
+end
+
+local function any_window_for_buffer(buf)
+    return all_visible_windows_for_buffer(buf)[1]
 end
 
 local function first_selectable_window_for_buffer(buf)
@@ -417,6 +464,141 @@ end
 
 local function fallback_buffer_for_displaced(buf)
     return vim.api.nvim_create_buf(true, false)
+end
+
+local function fallback_buffer_for_deleted()
+    local buf = vim.api.nvim_create_buf(false, true)
+
+    vim.bo[buf].buflisted = false
+
+    return buf
+end
+
+local function replace_windows_showing_buffer(buf, preferred_replacement)
+    local replacement = preferred_replacement
+
+    if not replacement or not vim.api.nvim_buf_is_valid(replacement) or replacement == buf then
+        replacement = replacement_buffer(buf)
+    end
+
+    for _, win in ipairs(all_visible_windows_for_buffer(buf)) do
+        if vim.api.nvim_win_is_valid(win) then
+            if replacement and vim.api.nvim_buf_is_valid(replacement) then
+                vim.api.nvim_win_set_buf(win, replacement)
+            else
+                vim.api.nvim_win_set_buf(win, fallback_buffer_for_deleted())
+            end
+        end
+    end
+end
+
+local function clear_windows_showing_buffer(buf)
+    for _, win in ipairs(all_visible_windows_for_buffer(buf)) do
+        if vim.api.nvim_win_is_valid(win) then
+            vim.api.nvim_win_set_buf(win, fallback_buffer_for_deleted())
+        end
+    end
+end
+
+local function current_tab_index()
+    local current = vim.api.nvim_get_current_tabpage()
+
+    for index, tabpage in ipairs(vim.api.nvim_list_tabpages()) do
+        if tabpage == current then
+            return index
+        end
+    end
+
+    return vim.fn.tabpagenr()
+end
+
+local function restore_tabpage(tabpage, win)
+    if vim.api.nvim_tabpage_is_valid(tabpage) then
+        vim.api.nvim_set_current_tabpage(tabpage)
+    end
+
+    if win and vim.api.nvim_win_is_valid(win) then
+        vim.api.nvim_set_current_win(win)
+    end
+end
+
+local function tab_prompt(index)
+    local total = vim.fn.tabpagenr("$")
+
+    vim.cmd("redraw!")
+
+    if vim.opt.cmdheight._value ~= 0 then
+        print(
+            string.format(
+                "Pick tab T%02d (%d/%d): h/l or arrows, Enter pick window, Esc cancel",
+                index - 1,
+                index,
+                total
+            )
+        )
+    end
+end
+
+local function pick_tab_for_window()
+    local tabpages = vim.api.nvim_list_tabpages()
+
+    if #tabpages <= 1 then
+        return true
+    end
+
+    local original_tabpage = vim.api.nvim_get_current_tabpage()
+    local original_win = vim.api.nvim_get_current_win()
+    local index = current_tab_index()
+
+    tab_prompt(index)
+
+    while true do
+        local ok, input = pcall(vim.fn.getcharstr)
+
+        if not ok then
+            restore_tabpage(original_tabpage, original_win)
+            return false
+        end
+
+        local key = vim.fn.keytrans(input or "")
+
+        if input == "\13" or input == "\10" or input == "\r" then
+            vim.cmd("redraw")
+            return true
+        end
+
+        if input == "\27" then
+            restore_tabpage(original_tabpage, original_win)
+            vim.cmd("redraw")
+            return false
+        end
+
+        if input == "h" or input == "H" or key == "<Left>" then
+            index = index - 1
+
+            if index < 1 then
+                index = #tabpages
+            end
+        elseif input == "l" or input == "L" or key == "<Right>" then
+            index = index + 1
+
+            if index > #tabpages then
+                index = 1
+            end
+        else
+            tab_prompt(index)
+            goto continue
+        end
+
+        if vim.api.nvim_tabpage_is_valid(tabpages[index]) then
+            vim.api.nvim_set_current_tabpage(tabpages[index])
+        end
+
+        vim.cmd("redraw!")
+        tab_prompt(index)
+
+        ::continue::
+    end
 end
 
 local function open_selected(prompt_bufnr)
@@ -489,17 +671,7 @@ local function delete_selected(prompt_bufnr, force)
         return
     end
 
-    local current = vim.api.nvim_get_current_buf()
-
-    if buf == current then
-        local replacement = replacement_buffer(current)
-
-        if replacement then
-            vim.api.nvim_win_set_buf(0, replacement)
-        else
-            vim.cmd("enew")
-        end
-    end
+    clear_windows_showing_buffer(buf)
 
     local ok, err = delete_buffer(buf, force)
 
@@ -531,6 +703,8 @@ local function delete_others_except(buf, force)
 
     for _, listed_buf in ipairs(listed_buffers()) do
         if listed_buf ~= buf then
+            replace_windows_showing_buffer(listed_buf, buf)
+
             local ok, err = delete_buffer(listed_buf, force)
 
             if not ok then
@@ -580,12 +754,20 @@ local function move_selected(prompt_bufnr)
         return
     end
 
+    local original_tabpage = vim.api.nvim_get_current_tabpage()
+    local original_win = vim.api.nvim_get_current_win()
+
     close_picker(prompt_bufnr)
 
     vim.schedule(function()
         local ok_picker, window_picker = pcall(require, "config.window_picker")
 
         if not ok_picker then
+            return
+        end
+
+        if not pick_tab_for_window() then
+            M.pick(buf)
             return
         end
 
@@ -598,6 +780,8 @@ local function move_selected(prompt_bufnr)
         })
 
         if not target_win or target_win == -1 then
+            restore_tabpage(original_tabpage, original_win)
+            M.pick(buf)
             return
         end
 
@@ -612,12 +796,20 @@ local function copy_selected(prompt_bufnr)
         return
     end
 
+    local original_tabpage = vim.api.nvim_get_current_tabpage()
+    local original_win = vim.api.nvim_get_current_win()
+
     close_picker(prompt_bufnr)
 
     vim.schedule(function()
         local ok_picker, window_picker = pcall(require, "config.window_picker")
 
         if not ok_picker then
+            return
+        end
+
+        if not pick_tab_for_window() then
+            M.pick(buf)
             return
         end
 
@@ -630,6 +822,8 @@ local function copy_selected(prompt_bufnr)
         })
 
         if not target_win or target_win == -1 then
+            restore_tabpage(original_tabpage, original_win)
+            M.pick(buf)
             return
         end
 
@@ -637,7 +831,49 @@ local function copy_selected(prompt_bufnr)
     end)
 end
 
-local function buffer_picker()
+local function open_in_window_selected(prompt_bufnr)
+    local buf = selected_buffer(prompt_bufnr)
+
+    if not buf then
+        return
+    end
+
+    local original_tabpage = vim.api.nvim_get_current_tabpage()
+    local original_win = vim.api.nvim_get_current_win()
+
+    close_picker(prompt_bufnr)
+
+    vim.schedule(function()
+        local ok_picker, window_picker = pcall(require, "config.window_picker")
+
+        if not ok_picker then
+            return
+        end
+
+        if not pick_tab_for_window() then
+            M.pick(buf)
+            return
+        end
+
+        local target_win = window_picker.pick_window({
+            filetype = {
+                "NvimTree",
+                "notify",
+                "FloatingTerminal",
+            },
+        })
+
+        if not target_win or target_win == -1 then
+            restore_tabpage(original_tabpage, original_win)
+            M.pick(buf)
+            return
+        end
+
+        M.open_buffer_in_window(buf, target_win)
+    end)
+end
+
+local function buffer_picker(initial_buf)
     local pickers = require("telescope.pickers")
     local finders = require("telescope.finders")
     local conf = require("telescope.config").values
@@ -663,6 +899,7 @@ local function buffer_picker()
     end)
 
     local buffers = {}
+    local default_selection_index = nil
     local max_bufnr = math.max(unpack(bufnrs))
     local opts = {
         bufnr_width = #tostring(max_bufnr),
@@ -672,6 +909,10 @@ local function buffer_picker()
     }
 
     for index, buf in ipairs(bufnrs) do
+        if buf == initial_buf then
+            default_selection_index = index
+        end
+
         table.insert(buffers, {
             bufnr = buf,
             flag = buf == vim.fn.bufnr("") and "%" or (buf == vim.fn.bufnr("#") and "#" or " "),
@@ -682,7 +923,8 @@ local function buffer_picker()
 
     pickers.new(opts, {
         prompt_title = "Buffers",
-        results_title = "Enter open | m move | y copy | d/D delete | o/O keep only",
+        results_title = "Enter open | w window | m move | y copy | d/D delete | o/O keep only",
+        default_selection_index = default_selection_index,
         finder = finders.new_table({
             results = buffers,
             entry_maker = buffer_entry_maker(opts),
@@ -714,6 +956,10 @@ local function buffer_picker()
                 keep_selected_only(prompt_bufnr, true)
             end)
 
+            map("n", "w", function()
+                open_in_window_selected(prompt_bufnr)
+            end)
+
             map("n", "m", function()
                 move_selected(prompt_bufnr)
             end)
@@ -727,15 +973,19 @@ local function buffer_picker()
     }):find()
 end
 
-function M.pick()
+function M.pick(initial_buf)
     local ok = pcall(require, "telescope.pickers")
 
     if ok then
-        buffer_picker()
+        buffer_picker(initial_buf)
         return
     end
 
     vim.cmd("buffers")
+end
+
+function M.pick_tab_for_window()
+    return pick_tab_for_window()
 end
 
 function M.next()
@@ -856,7 +1106,7 @@ function M.move_buffer_to_window(buf, target_win)
         return false
     end
 
-    local source_win = window_for_buffer(buf)
+    local source_win = any_window_for_buffer(buf)
     local target_buf = vim.api.nvim_win_get_buf(target_win)
 
     if source_win and source_win == target_win then
@@ -912,7 +1162,7 @@ function M.open_buffer_in_window(buf, target_win, opts)
         return true
     end
 
-    local old_visible_count = visible_window_count(old_buf)
+    local old_visible_count = all_visible_window_count(old_buf)
     local delete_old = opts.delete_old_if_safe
         and old_visible_count == 1
         and movable_buffer(old_buf)

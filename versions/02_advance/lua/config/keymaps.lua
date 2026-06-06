@@ -41,9 +41,16 @@ local function only_non_tree_window()
 end
 
 local buffers = require("config.buffers")
+local sessions = require("config.sessions")
 local settings = require("config.settings")
+local tabs = require("config.tabs")
 local terminal = require("config.terminal")
 local window_picker = require("config.window_picker")
+
+tabs.setup()
+if window_picker.setup then
+    window_picker.setup()
+end
 
 local ignored_quit_filetypes = {
     FloatingTerminal = true,
@@ -244,6 +251,48 @@ vim.keymap.set("n", "<leader>`", terminal.open_float_terminal, {
     desc = "Toggle floating terminal",
 })
 
+vim.keymap.set("n", "<leader><Tab><Tab>", tabs.pick, {
+    noremap = true,
+    silent = true,
+    desc = "Pick tab",
+})
+
+vim.keymap.set("n", "<leader><Tab>n", tabs.new, {
+    noremap = true,
+    silent = true,
+    desc = "New tab",
+})
+
+vim.keymap.set("n", "<leader><Tab>c", tabs.close, {
+    noremap = true,
+    silent = true,
+    desc = "Close tab",
+})
+
+vim.keymap.set("n", "<leader><Tab>h", tabs.previous, {
+    noremap = true,
+    silent = true,
+    desc = "Previous tab",
+})
+
+vim.keymap.set("n", "<leader><Tab><Left>", tabs.previous, {
+    noremap = true,
+    silent = true,
+    desc = "Previous tab",
+})
+
+vim.keymap.set("n", "<leader><Tab>l", tabs.next, {
+    noremap = true,
+    silent = true,
+    desc = "Next tab",
+})
+
+vim.keymap.set("n", "<leader><Tab><Right>", tabs.next, {
+    noremap = true,
+    silent = true,
+    desc = "Next tab",
+})
+
 vim.keymap.set("n", "<leader><C-q>", ":q<CR>", {
     noremap = true,
     silent = true,
@@ -350,6 +399,30 @@ end, {
     noremap = true,
     silent = true,
     desc = "Force delete other buffers",
+})
+
+for _, slot in ipairs(sessions.configured_slot_ids()) do
+    vim.keymap.set("n", "<leader>P" .. slot, function()
+        sessions.save(slot)
+    end, {
+        noremap = true,
+        silent = true,
+        desc = "Save session " .. slot,
+    })
+
+    vim.keymap.set("n", "<leader>p" .. slot, function()
+        sessions.load(slot)
+    end, {
+        noremap = true,
+        silent = true,
+        desc = "Load session " .. slot,
+    })
+end
+
+vim.keymap.set("n", "<leader>pp", sessions.pick, {
+    noremap = true,
+    silent = true,
+    desc = "Pick session",
 })
 
 vim.keymap.set("n", "<leader>ww", window_picker.focus_window, {

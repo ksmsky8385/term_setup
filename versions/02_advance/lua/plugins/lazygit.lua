@@ -10,6 +10,37 @@ return {
     dependencies = {
         "nvim-lua/plenary.nvim",
     },
+    config = function()
+        local function configure_lazygit_buffer(buf)
+            vim.keymap.set("t", "<Esc>", "<Esc>", {
+                buffer = buf,
+                noremap = true,
+                silent = true,
+                desc = "Send escape to lazygit",
+            })
+
+            vim.keymap.set("n", "<Esc>", "i", {
+                buffer = buf,
+                noremap = true,
+                silent = true,
+                desc = "Return to lazygit terminal mode",
+            })
+        end
+
+        vim.api.nvim_create_autocmd("TermOpen", {
+            pattern = "*lazygit*",
+            callback = function(args)
+                configure_lazygit_buffer(args.buf)
+            end,
+        })
+
+        vim.api.nvim_create_autocmd("FileType", {
+            pattern = "lazygit",
+            callback = function(args)
+                configure_lazygit_buffer(args.buf)
+            end,
+        })
+    end,
     keys = {
         {
             "<leader>gg",

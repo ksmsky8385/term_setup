@@ -250,7 +250,19 @@ return {
             })
         end
 
+        local function pick_tab_for_window()
+            if buffers.pick_tab_for_window then
+                return buffers.pick_tab_for_window()
+            end
+
+            return true
+        end
+
         local function open_file_in_split(node, split_cmd)
+            if not pick_tab_for_window() then
+                return
+            end
+
             local target_win = pick_open_window()
 
             if not target_win or target_win == -1 then
@@ -281,6 +293,10 @@ return {
             end
 
             if mode == "pick" then
+                if not pick_tab_for_window() then
+                    return
+                end
+
                 local target_win = pick_open_window()
 
                 if not target_win or target_win == -1 then

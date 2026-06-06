@@ -8,7 +8,6 @@ return {
     config = function()
         local alpha = require("alpha")
         local dashboard = require("alpha.themes.dashboard")
-        local previous_buf = nil
 
         local version = vim.version()
         local version_text = string.format(
@@ -296,15 +295,21 @@ return {
             local buf = vim.api.nvim_get_current_buf()
 
             if is_returnable_buffer(buf) then
-                previous_buf = buf
+                vim.w.config_dashboard_previous_buf = buf
+            else
+                vim.w.config_dashboard_previous_buf = nil
             end
         end
 
         local function return_to_previous_buffer()
+            local previous_buf = vim.w.config_dashboard_previous_buf
+
             if previous_buf and is_returnable_buffer(previous_buf) then
                 vim.api.nvim_win_set_buf(0, previous_buf)
                 return true
             end
+
+            vim.w.config_dashboard_previous_buf = nil
 
             return false
         end
@@ -320,6 +325,12 @@ return {
             end
 
             vim.cmd("DashboardQuit")
+        end
+
+        local function redraw_dashboard()
+            dashboard.section.header.val = make_header()
+            alpha.setup(dashboard.opts)
+            pcall(vim.cmd, "AlphaRedraw")
         end
 
         dashboard.section.header.val = make_header()
@@ -358,6 +369,11 @@ return {
                 end, opts)
 
                 vim.keymap.set("n", "<leader>q", close_dashboard_or_quit, opts)
+                vim.keymap.set("n", "<leader>h", function()
+                    if not return_to_previous_buffer() then
+                        redraw_dashboard()
+                    end
+                end, opts)
             end,
         })
 
@@ -366,6 +382,9 @@ return {
                 if return_to_previous_buffer() then
                     return
                 end
+
+                redraw_dashboard()
+                return
             else
                 remember_current_buffer()
             end
