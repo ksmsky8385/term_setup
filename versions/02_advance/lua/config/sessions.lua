@@ -553,7 +553,9 @@ function M.save(slot, force, opts)
 
     write_metadata(slot, metadata)
 
-    vim.notify("Saved session " .. slot)
+    if opts.notify ~= false then
+        vim.notify("Saved session " .. slot)
+    end
 
     if opts.on_update then
         opts.on_update()
@@ -878,7 +880,9 @@ local function open_note_editor(slot, opts)
             metadata.note = next_note
 
             write_metadata(slot, metadata)
-            vim.notify("Updated session " .. slot .. " note")
+            if opts.notify ~= false then
+                vim.notify("Updated session " .. slot .. " note")
+            end
             close_editor()
 
             if opts.on_update then
@@ -1308,6 +1312,12 @@ function M.pick(opts)
                     end)
                 end
 
+                local notify_after_picker_update = function(message)
+                    vim.defer_fn(function()
+                        vim.notify(message)
+                    end, 50)
+                end
+
                 local selected_slot = function()
                     local selected = telescope.action_state.get_selected_entry()
 
@@ -1470,11 +1480,13 @@ function M.pick(opts)
                         end
 
                         M.save(slot, false, {
+                            notify = false,
                             before_write = function()
                                 close_picker()
                             end,
                             on_update = function()
                                 reopen()
+                                notify_after_picker_update("Saved session " .. slot)
                             end,
                             on_cancel = function()
                                 reopen()
@@ -1517,8 +1529,10 @@ function M.pick(opts)
 
                     if slot ~= nil then
                         M.note(slot, {
+                            notify = false,
                             on_update = function()
                                 refresh_picker(slot, row)
+                                notify_after_picker_update("Updated session " .. slot .. " note")
                             end,
                             on_close = function()
                                 vim.schedule(function()
