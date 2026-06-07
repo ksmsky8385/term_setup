@@ -11,6 +11,24 @@ return {
         "nvim-lua/plenary.nvim",
     },
     config = function()
+        local function refresh_after_lazygit()
+            vim.schedule(function()
+                vim.cmd("checktime")
+
+                local ok_gitsigns, gitsigns = pcall(require, "gitsigns")
+
+                if ok_gitsigns and gitsigns.refresh then
+                    pcall(gitsigns.refresh)
+                end
+
+                local ok_tree, api = pcall(require, "nvim-tree.api")
+
+                if ok_tree then
+                    pcall(api.tree.reload)
+                end
+            end)
+        end
+
         local function configure_lazygit_buffer(buf)
             vim.keymap.set("t", "<Esc>", "<Esc>", {
                 buffer = buf,
@@ -39,6 +57,11 @@ return {
             callback = function(args)
                 configure_lazygit_buffer(args.buf)
             end,
+        })
+
+        vim.api.nvim_create_autocmd("TermClose", {
+            pattern = "*lazygit*",
+            callback = refresh_after_lazygit,
         })
     end,
     keys = {
