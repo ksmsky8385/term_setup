@@ -162,7 +162,7 @@ return {
             dashboard.button("w", "󰉋   Change workspace", ":WorkspacePick<CR>"),
             dashboard.button("t", "󰙅   Toggle tree", ":TreeToggle<CR>"),
             dashboard.button("s", "   Settings", ":Settings<CR>"),
-            dashboard.button("a", "   About Neovim", ":AboutNeovim<CR>"),
+            dashboard.button("a", "   About Neovim", "<cmd>AboutNeovim<CR>"),
             dashboard.button("q", "   Quit Neovim", ":DashboardQuit<CR>"),
         }
 

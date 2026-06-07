@@ -63,18 +63,24 @@ return {
         end
 
         local function close_preview()
+            local closed = false
+
             if preview_win and vim.api.nvim_win_is_valid(preview_win) then
                 vim.api.nvim_win_close(preview_win, true)
+                closed = true
             end
 
             if preview_buf and vim.api.nvim_buf_is_valid(preview_buf) then
                 vim.api.nvim_buf_delete(preview_buf, { force = true })
+                closed = true
             end
 
             preview_win = nil
             preview_buf = nil
             preview_tree_win = nil
             preview_path = nil
+
+            return closed
         end
 
         local function focus_preview()
@@ -220,6 +226,41 @@ return {
                 silent = true,
                 desc = "Close file preview",
             })
+        end
+
+        local function workspace_root()
+            return vim.g.current_workspace_root or vim.fn.getcwd()
+        end
+
+        local function change_tree_root(path)
+            if type(path) ~= "string" or path == "" or vim.fn.isdirectory(path) == 0 then
+                return false
+            end
+
+            if api.tree.change_root then
+                pcall(api.tree.change_root, path)
+                return true
+            end
+
+            if api.tree.change_root_to_node then
+                pcall(api.tree.change_root_to_node, path)
+                return true
+            end
+
+            pcall(api.tree.open, {
+                path = path,
+                focus = true,
+            })
+
+            return true
+        end
+
+        local function close_preview_or_restore_root()
+            if close_preview() then
+                return
+            end
+
+            change_tree_root(workspace_root())
         end
 
         local function open_file_in_window(node, target_win)
@@ -401,8 +442,8 @@ return {
                 vim.keymap.set(
                     "n",
                     "<Esc>",
-                    close_preview,
-                    opts("Close file preview")
+                    close_preview_or_restore_root,
+                    opts("Close preview or restore tree root")
                 )
 
                 vim.keymap.set(

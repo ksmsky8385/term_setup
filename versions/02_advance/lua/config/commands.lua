@@ -68,6 +68,8 @@ end, {
 
 vim.api.nvim_create_user_command("AboutNeovim", function()
     about.open()
+    vim.cmd("redraw")
+    vim.api.nvim_echo({}, false, {})
 end, {})
 
 local function complete_session_slots()

@@ -54,28 +54,6 @@ local function delete_blocker(buf, force)
     return nil
 end
 
-local function replacement_buffer(current)
-    local hidden = hidden_replacement_buffer(current)
-
-    if hidden then
-        return hidden
-    end
-
-    local alternate = vim.fn.bufnr("#")
-
-    if alternate ~= current and movable_buffer(alternate) then
-        return alternate
-    end
-
-    for _, buf in ipairs(listed_buffers()) do
-        if buf ~= current and movable_buffer(buf) then
-            return buf
-        end
-    end
-
-    return nil
-end
-
 local function delete_buffer(buf, force)
     if not vim.api.nvim_buf_is_valid(buf) then
         return true
@@ -280,18 +258,13 @@ local function confirm_action(message)
     local ok, input = pcall(vim.fn.getcharstr)
 
     vim.cmd("redraw")
+    vim.api.nvim_echo({}, false, {})
 
     if not ok then
         return false
     end
 
     return input == "\13" or input == "\10" or input == "\r"
-end
-
-local function focus_buffer(buf)
-    if valid_listed_buffer(buf) then
-        vim.api.nvim_win_set_buf(0, buf)
-    end
 end
 
 local function notify_delete_error(err)
@@ -449,28 +422,153 @@ local function fallback_buffer_for_deleted()
     return buf
 end
 
-local function replace_windows_showing_buffer(buf, preferred_replacement)
-    local replacement = preferred_replacement
+local function target_window_count(tabpage)
+    local count = 0
 
-    if not replacement or not vim.api.nvim_buf_is_valid(replacement) or replacement == buf then
-        replacement = replacement_buffer(buf)
+    for _, win in ipairs(vim.api.nvim_tabpage_list_wins(tabpage)) do
+        if vim.api.nvim_win_is_valid(win) then
+            local buf = vim.api.nvim_win_get_buf(win)
+            local filetype = vim.bo[buf].filetype
+
+            if
+                filetype ~= "FloatingTerminal"
+                and filetype ~= "NvimTree"
+                and filetype ~= "TelescopePrompt"
+                and filetype ~= "TelescopeResults"
+                and filetype ~= "TelescopePreview"
+                and filetype ~= "notify"
+            then
+                count = count + 1
+            end
+        end
     end
+
+    return count
+end
+
+local function tabpage_for_window(target_win)
+    for _, tabpage in ipairs(vim.api.nvim_list_tabpages()) do
+        for _, win in ipairs(vim.api.nvim_tabpage_list_wins(tabpage)) do
+            if win == target_win then
+                return tabpage
+            end
+        end
+    end
+
+    return nil
+end
+
+local function fallback_for_cleared_window(win, original_buf)
+    local fallback
+    local tabpage = tabpage_for_window(win)
+
+    if tabpage and target_window_count(tabpage) == 1 then
+        pcall(vim.api.nvim_set_current_win, win)
+
+        if pcall(vim.cmd, "DashboardHome") and vim.api.nvim_win_is_valid(win) then
+            fallback = vim.api.nvim_win_get_buf(win)
+        end
+    end
+
+    if not fallback or fallback == original_buf or not vim.api.nvim_buf_is_valid(fallback) then
+        fallback = fallback_buffer_for_deleted()
+        vim.api.nvim_win_set_buf(win, fallback)
+    end
+
+    return fallback
+end
+
+local function clear_windows_showing_buffer(buf)
+    local cleared = {}
+    local current_win = vim.api.nvim_get_current_win()
 
     for _, win in ipairs(all_visible_windows_for_buffer(buf)) do
         if vim.api.nvim_win_is_valid(win) then
-            if replacement and vim.api.nvim_buf_is_valid(replacement) then
-                vim.api.nvim_win_set_buf(win, replacement)
-            else
-                vim.api.nvim_win_set_buf(win, fallback_buffer_for_deleted())
-            end
+            local fallback = fallback_for_cleared_window(win, buf)
+
+            table.insert(cleared, {
+                win = win,
+                fallback = fallback,
+            })
+        end
+    end
+
+    if vim.api.nvim_win_is_valid(current_win) then
+        pcall(vim.api.nvim_set_current_win, current_win)
+    end
+
+    return cleared
+end
+
+local function restore_windows_after_failed_delete(buf, cleared)
+    if not vim.api.nvim_buf_is_valid(buf) then
+        return
+    end
+
+    for _, entry in ipairs(cleared) do
+        if vim.api.nvim_win_is_valid(entry.win) then
+            pcall(vim.api.nvim_win_set_buf, entry.win, buf)
+        end
+
+        if vim.api.nvim_buf_is_valid(entry.fallback) then
+            pcall(vim.api.nvim_buf_delete, entry.fallback, {
+                force = true,
+            })
         end
     end
 end
 
-local function clear_windows_showing_buffer(buf)
-    for _, win in ipairs(all_visible_windows_for_buffer(buf)) do
-        if vim.api.nvim_win_is_valid(win) then
-            vim.api.nvim_win_set_buf(win, fallback_buffer_for_deleted())
+local function clear_listed_windows_except(keep_windows)
+    local cleared = {}
+    local keep = {}
+    local ignored_filetypes = {
+        FloatingTerminal = true,
+        NvimTree = true,
+        notify = true,
+    }
+
+    for _, win in ipairs(keep_windows or {}) do
+        keep[win] = true
+    end
+
+    for _, tabpage in ipairs(vim.api.nvim_list_tabpages()) do
+        for _, win in ipairs(vim.api.nvim_tabpage_list_wins(tabpage)) do
+            if vim.api.nvim_win_is_valid(win) and not keep[win] then
+                local original = vim.api.nvim_win_get_buf(win)
+
+                if
+                    valid_listed_buffer(original)
+                    and not ignored_filetypes[vim.bo[original].filetype]
+                then
+                    local fallback = fallback_buffer_for_deleted()
+
+                    vim.api.nvim_win_set_buf(win, fallback)
+                    table.insert(cleared, {
+                        win = win,
+                        original = original,
+                        fallback = fallback,
+                    })
+                end
+            end
+        end
+    end
+
+    return cleared
+end
+
+local function restore_cleared_windows(cleared)
+    for _, entry in ipairs(cleared) do
+        if
+            vim.api.nvim_win_is_valid(entry.win)
+            and vim.api.nvim_buf_is_valid(entry.original)
+        then
+            pcall(vim.api.nvim_win_set_buf, entry.win, entry.original)
+        end
+
+        if vim.api.nvim_buf_is_valid(entry.fallback) then
+            pcall(vim.api.nvim_buf_delete, entry.fallback, {
+                force = true,
+            })
         end
     end
 end
@@ -646,11 +744,12 @@ local function delete_selected(prompt_bufnr, force)
         return
     end
 
-    clear_windows_showing_buffer(buf)
+    local cleared_windows = clear_windows_showing_buffer(buf)
 
     local ok, err = delete_buffer(buf, force)
 
     if not ok then
+        restore_windows_after_failed_delete(buf, cleared_windows)
         notify_delete_error(err)
         return
     end
@@ -659,7 +758,9 @@ local function delete_selected(prompt_bufnr, force)
     vim.schedule(M.pick)
 end
 
-local function delete_others_except(buf, force)
+local function delete_others_except(buf, force, opts)
+    opts = opts or {}
+
     local blockers = {}
 
     for _, listed_buf in ipairs(listed_buffers()) do
@@ -676,13 +777,14 @@ local function delete_others_except(buf, force)
         return false, table.concat(blockers, "\n")
     end
 
+    local cleared_windows = clear_listed_windows_except(opts.keep_windows)
+
     for _, listed_buf in ipairs(listed_buffers()) do
         if listed_buf ~= buf then
-            replace_windows_showing_buffer(listed_buf, buf)
-
             local ok, err = delete_buffer(listed_buf, force)
 
             if not ok then
+                restore_cleared_windows(cleared_windows)
                 return false, err
             end
         end
@@ -711,7 +813,9 @@ local function keep_selected_only(prompt_bufnr, force)
         return
     end
 
-    local ok, err = delete_others_except(buf, force)
+    local ok, err = delete_others_except(buf, force, {
+        keep_windows = all_visible_windows_for_buffer(buf),
+    })
 
     if not ok then
         notify_delete_error(err)
@@ -719,7 +823,9 @@ local function keep_selected_only(prompt_bufnr, force)
     end
 
     close_picker(prompt_bufnr)
-    focus_buffer(buf)
+    vim.schedule(function()
+        M.pick(buf)
+    end)
 end
 
 local function move_selected(prompt_bufnr)
@@ -981,6 +1087,19 @@ end
 
 function M.delete_current(force)
     local current = vim.api.nvim_get_current_buf()
+
+    if all_visible_window_count(current) > 1 then
+        local current_win = vim.api.nvim_get_current_win()
+
+        fallback_for_cleared_window(current_win, current)
+
+        if vim.api.nvim_win_is_valid(current_win) then
+            pcall(vim.api.nvim_set_current_win, current_win)
+        end
+
+        return true
+    end
+
     local blocker = delete_blocker(current, force)
 
     if blocker then
@@ -988,18 +1107,12 @@ function M.delete_current(force)
         return false
     end
 
-    local replacement = replacement_buffer(current)
-
-    if replacement then
-        vim.api.nvim_win_set_buf(0, replacement)
-    else
-        vim.cmd("enew")
-        vim.bo.buflisted = false
-    end
+    local cleared_windows = clear_windows_showing_buffer(current)
 
     local ok, err = delete_buffer(current, force)
 
     if not ok then
+        restore_windows_after_failed_delete(current, cleared_windows)
         notify_delete_error(err)
     end
 
@@ -1134,8 +1247,11 @@ end
 
 function M.delete_others(force)
     local current = vim.api.nvim_get_current_buf()
+    local current_win = vim.api.nvim_get_current_win()
 
-    local ok, err = delete_others_except(current, force)
+    local ok, err = delete_others_except(current, force, {
+        keep_windows = { current_win },
+    })
 
     if not ok then
         notify_delete_error(err)

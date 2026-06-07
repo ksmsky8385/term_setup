@@ -286,7 +286,7 @@ vim.keymap.set("n", "<leader><Tab>n", tabs.new, {
     desc = "New tab",
 })
 
-vim.keymap.set("n", "<leader><Tab>c", tabs.close, {
+vim.keymap.set("n", "<leader><Tab>q", tabs.close, {
     noremap = true,
     silent = true,
     desc = "Close tab",
@@ -448,7 +448,9 @@ vim.keymap.set("n", "<leader>wo", only_non_tree_window, {
     desc = "Close other windows",
 })
 
-vim.keymap.set("n", "<leader>wq", ":q<CR>", {
+vim.keymap.set("n", "<leader>wq", function()
+    close_current_window_or_dashboard(vim.api.nvim_get_current_win())
+end, {
     noremap = true,
     silent = true,
     desc = "Close current window",

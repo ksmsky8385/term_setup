@@ -16,7 +16,6 @@ local session_slot_ids = {
 }
 local session_options = {
     "buffers",
-    "curdir",
     "folds",
     "help",
     "tabpages",
@@ -399,6 +398,63 @@ local function restore_tree(tree)
     end
 end
 
+local function fallback_buffer_for_missing_file()
+    local buf = vim.api.nvim_create_buf(false, true)
+
+    vim.bo[buf].buflisted = false
+
+    return buf
+end
+
+local function visible_windows_for_buffer(buf)
+    local windows = {}
+
+    for _, tabpage in ipairs(vim.api.nvim_list_tabpages()) do
+        for _, win in ipairs(vim.api.nvim_tabpage_list_wins(tabpage)) do
+            if
+                vim.api.nvim_win_is_valid(win)
+                and vim.api.nvim_win_get_buf(win) == buf
+            then
+                table.insert(windows, win)
+            end
+        end
+    end
+
+    return windows
+end
+
+local function clear_missing_file_buffers()
+    local missing = {}
+
+    for _, buf in ipairs(vim.api.nvim_list_bufs()) do
+        local name = vim.api.nvim_buf_get_name(buf)
+
+        if
+            vim.api.nvim_buf_is_valid(buf)
+            and vim.bo[buf].buflisted
+            and vim.bo[buf].buftype == ""
+            and name ~= ""
+            and vim.fn.filereadable(name) == 0
+        then
+            table.insert(missing, vim.fn.fnamemodify(name, ":~:."))
+
+            for _, win in ipairs(visible_windows_for_buffer(buf)) do
+                if vim.api.nvim_win_is_valid(win) then
+                    vim.api.nvim_win_set_buf(win, fallback_buffer_for_missing_file())
+                end
+            end
+
+            pcall(vim.api.nvim_buf_delete, buf, {
+                force = true,
+            })
+        end
+    end
+
+    if #missing > 0 then
+        vim.notify("Missing session files: " .. table.concat(missing, ", "), vim.log.levels.WARN)
+    end
+end
+
 local function file_mtime(path)
     local stat = vim.loop.fs_stat(path)
 
@@ -647,6 +703,24 @@ function M.move(from_slot, to_slot, opts)
 end
 
 local function load_session(slot, path)
+    local metadata = read_metadata(slot)
+    local cwd = metadata.cwd
+    local workspace = vim.fn.getcwd()
+
+    if type(cwd) == "string" and cwd ~= "" then
+        if vim.fn.isdirectory(cwd) == 1 then
+            pcall(vim.cmd, "cd " .. vim.fn.fnameescape(cwd))
+            workspace = vim.fn.getcwd()
+        else
+            vim.notify(
+                "Session workspace is missing: " .. cwd .. ". Using current workspace: " .. workspace,
+                vim.log.levels.WARN
+            )
+        end
+    end
+
+    vim.g.current_workspace_root = workspace
+
     local ok, err = pcall(function()
         vim.cmd("source " .. vim.fn.fnameescape(path))
     end)
@@ -656,9 +730,11 @@ local function load_session(slot, path)
         return
     end
 
-    local metadata = read_metadata(slot)
+    pcall(vim.cmd, "cd " .. vim.fn.fnameescape(workspace))
+    vim.g.current_workspace_root = vim.fn.getcwd()
 
     vim.schedule(function()
+        clear_missing_file_buffers()
         restore_terminals(metadata.terminals)
         restore_tree(metadata.tree)
 
