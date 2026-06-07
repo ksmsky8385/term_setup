@@ -299,12 +299,6 @@ vim.keymap.set("n", "<leader><C-q>", ":q<CR>", {
     desc = "Close current window",
 })
 
-vim.keymap.set("t", "<leader><C-q>", "<C-\\><C-n><cmd>q<CR>", {
-    noremap = true,
-    silent = true,
-    desc = "Close current window",
-})
-
 vim.keymap.set("n", "<leader>q", function()
     leader_quit(false)
 end, {
@@ -313,34 +307,12 @@ end, {
     desc = "Close current window",
 })
 
-vim.keymap.set("t", "<leader>q", function()
-    stop_terminal_insert()
-    vim.schedule(function()
-        leader_quit(false)
-    end)
-end, {
-    noremap = true,
-    silent = true,
-    desc = "Close current terminal window",
-})
-
 vim.keymap.set("n", "<leader>Q", function()
     leader_quit(true)
 end, {
     noremap = true,
     silent = true,
     desc = "Force close current window",
-})
-
-vim.keymap.set("t", "<leader>Q", function()
-    stop_terminal_insert()
-    vim.schedule(function()
-        leader_quit(true)
-    end)
-end, {
-    noremap = true,
-    silent = true,
-    desc = "Force close current terminal",
 })
 
 vim.keymap.set("n", "<leader><C-s>", function()
