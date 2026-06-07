@@ -35,6 +35,13 @@ function M.open()
         "    :version           Neovim 버전 정보",
         "    :messages          최근 메시지 확인",
         "",
+        "  표시 설정",
+        "",
+        "    줄번호 설정 위치   lua/config/options.lua",
+        "    일반 줄번호        vim.opt.number = true",
+        "    상대 줄번호        vim.opt.relativenumber = true 로 변경",
+        "    표시 방식          현재 줄은 실제 번호, 위/아래 줄은 현재 줄과의 거리",
+        "",
         "  전체 단축키",
         "",
         "    Space h            대시보드로 돌아가기",
@@ -240,14 +247,14 @@ function M.open()
         "  42 Header",
         "",
         "    :Stdheader         현재 파일에 42 헤더 추가/갱신",
-        "    F1                 42 헤더 추가/갱신",
-        "    FORTYTWO_USER      42 intra id 환경변수",
-        "    FORTYTWO_MAIL      42 email 환경변수",
+        "    Insert F1          42 헤더 추가/갱신",
+        "    NAME               42 intra id 환경변수",
+        "    MAIL               42 email 환경변수",
         "",
         "    환경변수 적용법",
         "      ~/.zshrc 에 아래 두 줄 추가",
-        "      export FORTYTWO_USER=\"your_intra_id\"",
-        "      export FORTYTWO_MAIL=\"your_email@student.42seoul.kr\"",
+        "      export NAME=\"your_intra_id\"",
+        "      export MAIL=\"your_email@student.42seoul.kr\"",
         "      source ~/.zshrc 후 Neovim 재시작",
         "",
         "  종료",
@@ -291,6 +298,12 @@ function M.open()
     })
 
     vim.keymap.set("n", "<Esc>", back_to_dashboard, {
+        buffer = true,
+        silent = true,
+        desc = "Back to dashboard",
+    })
+
+    vim.keymap.set("n", "<leader>h", back_to_dashboard, {
         buffer = true,
         silent = true,
         desc = "Back to dashboard",

@@ -259,6 +259,7 @@ return {
 
             return vim.api.nvim_buf_is_valid(buf)
                 and vim.bo[buf].buflisted
+                and vim.bo[buf].buftype == ""
                 and vim.bo[buf].filetype ~= "FloatingTerminal"
                 and vim.bo[buf].filetype ~= "alpha"
                 and vim.bo[buf].filetype ~= "NvimTree"
@@ -296,8 +297,6 @@ return {
 
             if is_returnable_buffer(buf) then
                 vim.w.config_dashboard_previous_buf = buf
-            else
-                vim.w.config_dashboard_previous_buf = nil
             end
         end
 
