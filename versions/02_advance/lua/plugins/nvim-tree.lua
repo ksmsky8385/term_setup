@@ -228,10 +228,6 @@ return {
             })
         end
 
-        local function workspace_root()
-            return vim.g.current_workspace_root or vim.fn.getcwd()
-        end
-
         local function change_tree_root(path)
             if type(path) ~= "string" or path == "" or vim.fn.isdirectory(path) == 0 then
                 return false
@@ -260,7 +256,7 @@ return {
                 return
             end
 
-            change_tree_root(workspace_root())
+            change_tree_root(vim.g.current_workspace_root or vim.fn.getcwd())
         end
 
         local function open_file_in_window(node, target_win)

@@ -398,31 +398,6 @@ local function restore_tree(tree)
     end
 end
 
-local function fallback_buffer_for_missing_file()
-    local buf = vim.api.nvim_create_buf(false, true)
-
-    vim.bo[buf].buflisted = false
-
-    return buf
-end
-
-local function visible_windows_for_buffer(buf)
-    local windows = {}
-
-    for _, tabpage in ipairs(vim.api.nvim_list_tabpages()) do
-        for _, win in ipairs(vim.api.nvim_tabpage_list_wins(tabpage)) do
-            if
-                vim.api.nvim_win_is_valid(win)
-                and vim.api.nvim_win_get_buf(win) == buf
-            then
-                table.insert(windows, win)
-            end
-        end
-    end
-
-    return windows
-end
-
 local function clear_missing_file_buffers()
     local missing = {}
 
@@ -438,9 +413,17 @@ local function clear_missing_file_buffers()
         then
             table.insert(missing, vim.fn.fnamemodify(name, ":~:."))
 
-            for _, win in ipairs(visible_windows_for_buffer(buf)) do
-                if vim.api.nvim_win_is_valid(win) then
-                    vim.api.nvim_win_set_buf(win, fallback_buffer_for_missing_file())
+            for _, tabpage in ipairs(vim.api.nvim_list_tabpages()) do
+                for _, win in ipairs(vim.api.nvim_tabpage_list_wins(tabpage)) do
+                    if
+                        vim.api.nvim_win_is_valid(win)
+                        and vim.api.nvim_win_get_buf(win) == buf
+                    then
+                        local fallback = vim.api.nvim_create_buf(false, true)
+
+                        vim.bo[fallback].buflisted = false
+                        vim.api.nvim_win_set_buf(win, fallback)
+                    end
                 end
             end
 
