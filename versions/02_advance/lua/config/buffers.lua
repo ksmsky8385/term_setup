@@ -334,10 +334,6 @@ local function all_visible_windows_for_buffer(buf)
     return windows
 end
 
-local function visible_window_count(buf)
-    return #visible_windows_for_buffer(buf)
-end
-
 local function all_visible_window_count(buf)
     return #all_visible_windows_for_buffer(buf)
 end
@@ -394,27 +390,6 @@ hidden_replacement_buffer = function(current)
     end)
 
     return candidates[1]
-end
-
-local function set_window_buffer(win, buf)
-    if
-        vim.api.nvim_win_is_valid(win)
-        and vim.api.nvim_buf_is_valid(buf)
-    then
-        vim.api.nvim_win_set_buf(win, buf)
-        return true
-    end
-
-    return false
-end
-
-local function replace_current_buffer(replacement)
-    if replacement and set_window_buffer(0, replacement) then
-        return replacement
-    end
-
-    vim.cmd("enew")
-    return nil
 end
 
 local function can_delete_unique_window_buffer(buf, force)
@@ -1019,47 +994,8 @@ function M.delete_current(force)
         vim.api.nvim_win_set_buf(0, replacement)
     else
         vim.cmd("enew")
+        vim.bo.buflisted = false
     end
-
-    local ok, err = delete_buffer(current, force)
-
-    if not ok then
-        notify_delete_error(err)
-    end
-
-    return ok
-end
-
-function M.delete_current_to_empty(force)
-    local current = vim.api.nvim_get_current_buf()
-    local blocker = delete_blocker(current, force)
-
-    if blocker then
-        notify_delete_error(blocker)
-        return false
-    end
-
-    vim.cmd("enew")
-
-    local ok, err = delete_buffer(current, force)
-
-    if not ok then
-        notify_delete_error(err)
-    end
-
-    return ok
-end
-
-function M.delete_current_to_hidden_or_empty(force, fallback)
-    local current = vim.api.nvim_get_current_buf()
-    local blocker = delete_blocker(current, force)
-
-    if blocker then
-        notify_delete_error(blocker)
-        return false
-    end
-
-    replace_current_buffer(hidden_replacement_buffer(current) or fallback)
 
     local ok, err = delete_buffer(current, force)
 

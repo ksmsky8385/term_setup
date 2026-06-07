@@ -157,15 +157,6 @@ function M.label_for_window(win, exclude)
     return ""
 end
 
-function M.refresh_window_orders()
-    M.selectable_windows({
-        filetype = {
-            "NvimTree",
-            "notify",
-        },
-    })
-end
-
 function M.remember_window(win)
     win = win or vim.api.nvim_get_current_win()
 

@@ -161,19 +161,6 @@ function M.is_float_terminal(buf)
         and vim.b[buf].terminal_kind == FLOAT_TERMINAL_KIND
 end
 
-function M.status_label(buf)
-    if not buf then
-        local win = vim.g.statusline_winid or vim.api.nvim_get_current_win()
-        buf = vim.api.nvim_win_get_buf(win)
-    end
-
-    if vim.bo[buf].buftype == "terminal" then
-        return terminal_label(buf)
-    end
-
-    return ""
-end
-
 function M.is_status_terminal()
     local win = vim.g.statusline_winid or vim.api.nvim_get_current_win()
     local buf = vim.api.nvim_win_get_buf(win)

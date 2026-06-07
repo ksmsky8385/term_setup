@@ -3,14 +3,6 @@ vim.keymap.set("t", "<Esc>", "<C-\\><C-n>", {
     silent = true,
 })
 
-local function stop_terminal_insert()
-    vim.api.nvim_feedkeys(
-        vim.api.nvim_replace_termcodes("<C-\\><C-n>", true, false, true),
-        "n",
-        false
-    )
-end
-
 local function is_nvim_tree()
     return vim.bo.filetype == "NvimTree"
 end
@@ -18,6 +10,16 @@ end
 local function empty_unlisted_buffer()
     vim.cmd("enew")
     vim.bo.buflisted = false
+end
+
+local function is_empty_unlisted_buffer(buf)
+    return vim.api.nvim_buf_is_valid(buf)
+        and not vim.bo[buf].buflisted
+        and vim.api.nvim_buf_get_name(buf) == ""
+        and vim.bo[buf].buftype == ""
+        and not vim.bo[buf].modified
+        and vim.api.nvim_buf_line_count(buf) == 1
+        and vim.api.nvim_buf_get_lines(buf, 0, 1, false)[1] == ""
 end
 
 local function vertical_split_or_empty()
@@ -69,12 +71,21 @@ local function is_ignored_quit_window(win)
     return ignored_quit_filetypes[vim.bo[buf].filetype] == true
 end
 
-local function regular_window_count()
+local function close_target_window_count()
     local count = 0
 
     for _, win in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
-        if not is_ignored_quit_window(win) then
-            count = count + 1
+        if vim.api.nvim_win_is_valid(win) then
+            local buf = vim.api.nvim_win_get_buf(win)
+            local filetype = vim.bo[buf].filetype
+
+            if
+                filetype ~= "FloatingTerminal"
+                and filetype ~= "NvimTree"
+                and filetype ~= "notify"
+            then
+                count = count + 1
+            end
         end
     end
 
@@ -100,7 +111,7 @@ local function buffer_visible_in_other_window(buf, current_win)
 end
 
 local function close_current_window_or_dashboard(current_win)
-    if regular_window_count() > 1 then
+    if close_target_window_count() > 1 then
         pcall(vim.api.nvim_win_close, current_win, true)
     else
         pcall(vim.cmd, "DashboardHome")
@@ -167,7 +178,7 @@ local function leader_quit(force)
         })
 
         if vim.api.nvim_win_is_valid(current_win) then
-            if regular_window_count() > 1 then
+            if close_target_window_count() > 1 then
                 pcall(vim.api.nvim_win_close, current_win, true)
             else
                 pcall(vim.cmd, "DashboardHome")
@@ -192,7 +203,19 @@ local function leader_quit(force)
         return
     end
 
-    if regular_window_count() > 1 then
+    if is_empty_unlisted_buffer(current_buf) and close_target_window_count() > 1 then
+        local closed = pcall(vim.api.nvim_win_close, current_win, true)
+
+        if closed and vim.api.nvim_buf_is_valid(current_buf) then
+            pcall(vim.api.nvim_buf_delete, current_buf, {
+                force = true,
+            })
+        end
+
+        return
+    end
+
+    if close_target_window_count() > 1 then
         if not buffers.delete_current(force) then
             return
         end

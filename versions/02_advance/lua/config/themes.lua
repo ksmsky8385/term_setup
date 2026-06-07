@@ -55,10 +55,6 @@ function M.available()
     return list
 end
 
-function M.apply_default()
-    pcall(vim.cmd.colorscheme, M.default)
-end
-
 function M.saved()
     if vim.fn.filereadable(M.save_path) == 0 then
         return M.default
