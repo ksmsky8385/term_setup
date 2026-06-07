@@ -114,22 +114,27 @@ return {
             return nil
         end
 
+        local function clear_command_message()
+            vim.cmd("redraw")
+            vim.api.nvim_echo({}, false, {})
+        end
+
         local function confirm_quit()
             local blocker = quit_blocker()
 
             if blocker then
                 vim.api.nvim_echo({
                     {
-                        blocker .. " Type Q or qa! then Enter to force quit, or press Esc to cancel.",
+                        blocker .. " Press Q to force quit, Esc or any other key to cancel.",
                         "WarningMsg",
                     },
                 }, false, {})
 
-                local ok, input = pcall(vim.fn.input, "")
+                local ok, input = pcall(vim.fn.getcharstr)
 
-                vim.cmd("redraw")
+                clear_command_message()
 
-                if ok and (input == "Q" or input == "qa!") then
+                if ok and input == "Q" then
                     vim.cmd("qa!")
                 end
 
@@ -142,7 +147,7 @@ return {
 
             local ok, input = pcall(vim.fn.getcharstr)
 
-            vim.cmd("redraw")
+            clear_command_message()
 
             if not ok then
                 return
