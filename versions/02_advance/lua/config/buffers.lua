@@ -31,6 +31,13 @@ end
 local hidden_replacement_buffer
 local movable_buffer
 local buffer_terminal_kind
+local window_picker_exclude = {
+    filetype = {
+        "NvimTree",
+        "notify",
+        "FloatingTerminal",
+    },
+}
 
 local function terminal_job_running(buf)
     local job_id = vim.b[buf].terminal_job_id
@@ -81,14 +88,6 @@ local function visible_tab_labels_by_buffer()
     local labels = {}
     local max_width = 0
     local show_tab_label = vim.fn.tabpagenr("$") > 1
-    local exclude = {
-        filetype = {
-            "NvimTree",
-            "notify",
-            "FloatingTerminal",
-        },
-    }
-
     if not ok_picker then
         return labels, max_width
     end
@@ -99,9 +98,9 @@ local function visible_tab_labels_by_buffer()
 
         vim.api.nvim_set_current_tabpage(tabpage)
 
-        for _, win in ipairs(window_picker.selectable_windows(exclude)) do
+        for _, win in ipairs(window_picker.selectable_windows(window_picker_exclude)) do
             local buf = vim.api.nvim_win_get_buf(win)
-            local window_label = window_picker.label_for_window(win, exclude)
+            local window_label = window_picker.label_for_window(win, window_picker_exclude)
 
             if valid_listed_buffer(buf) and window_label ~= "" then
                 tab_labels[buf] = tab_labels[buf] or {}
@@ -391,16 +390,9 @@ end
 
 local function first_selectable_window_for_buffer(buf)
     local ok_picker, window_picker = pcall(require, "config.window_picker")
-    local exclude = {
-        filetype = {
-            "NvimTree",
-            "notify",
-            "FloatingTerminal",
-        },
-    }
 
     if ok_picker then
-        for _, win in ipairs(window_picker.selectable_windows(exclude)) do
+        for _, win in ipairs(window_picker.selectable_windows(window_picker_exclude)) do
             if vim.api.nvim_win_get_buf(win) == buf then
                 return win
             end
@@ -705,13 +697,7 @@ local function open_selected(prompt_bufnr)
             return
         end
 
-        local target_win = window_picker.pick_window({
-            filetype = {
-                "NvimTree",
-                "notify",
-                "FloatingTerminal",
-            },
-        })
+        local target_win = window_picker.pick_window(window_picker_exclude)
 
         if not target_win or target_win == -1 then
             M.pick()
@@ -852,13 +838,7 @@ local function move_selected(prompt_bufnr)
             return
         end
 
-        local target_win = window_picker.pick_window({
-            filetype = {
-                "NvimTree",
-                "notify",
-                "FloatingTerminal",
-            },
-        })
+        local target_win = window_picker.pick_window(window_picker_exclude)
 
         if not target_win or target_win == -1 then
             restore_tabpage(original_tabpage, original_win)
@@ -870,7 +850,7 @@ local function move_selected(prompt_bufnr)
     end)
 end
 
-local function copy_selected(prompt_bufnr)
+local function split_selected(prompt_bufnr, split_cmd)
     local buf = selected_buffer(prompt_bufnr)
 
     if not buf then
@@ -894,13 +874,7 @@ local function copy_selected(prompt_bufnr)
             return
         end
 
-        local target_win = window_picker.pick_window({
-            filetype = {
-                "NvimTree",
-                "notify",
-                "FloatingTerminal",
-            },
-        })
+        local target_win = window_picker.pick_window(window_picker_exclude)
 
         if not target_win or target_win == -1 then
             restore_tabpage(original_tabpage, original_win)
@@ -908,7 +882,7 @@ local function copy_selected(prompt_bufnr)
             return
         end
 
-        M.copy_buffer_to_window(buf, target_win)
+        M.open_buffer_in_split(buf, target_win, split_cmd)
     end)
 end
 
@@ -919,6 +893,11 @@ local function open_in_window_selected(prompt_bufnr)
         return
     end
 
+    if not movable_buffer(buf) then
+        vim.notify("Buffer can't be opened in window", vim.log.levels.WARN)
+        return
+    end
+
     local original_tabpage = vim.api.nvim_get_current_tabpage()
     local original_win = vim.api.nvim_get_current_win()
 
@@ -936,13 +915,7 @@ local function open_in_window_selected(prompt_bufnr)
             return
         end
 
-        local target_win = window_picker.pick_window({
-            filetype = {
-                "NvimTree",
-                "notify",
-                "FloatingTerminal",
-            },
-        })
+        local target_win = window_picker.pick_window(window_picker_exclude)
 
         if not target_win or target_win == -1 then
             restore_tabpage(original_tabpage, original_win)
@@ -990,21 +963,23 @@ local function buffer_picker(initial_buf)
     }
 
     for index, buf in ipairs(bufnrs) do
+        local sort_score = #bufnrs - index + 1
+
         if buf == initial_buf then
-            default_selection_index = index
+            default_selection_index = sort_score
         end
 
         table.insert(buffers, {
             bufnr = buf,
             flag = buf == vim.fn.bufnr("") and "%" or (buf == vim.fn.bufnr("#") and "#" or " "),
             info = vim.fn.getbufinfo(buf)[1],
-            sort_score = #bufnrs - index + 1,
+            sort_score = sort_score,
         })
     end
 
     pickers.new(opts, {
         prompt_title = "Buffers",
-        results_title = "Enter open | w window | m move | y copy | d/D delete | o/O keep only",
+        results_title = "Enter open | w window | m move | s/v split | d/D delete | o/O keep only",
         default_selection_index = default_selection_index,
         finder = finders.new_table({
             results = buffers,
@@ -1045,8 +1020,12 @@ local function buffer_picker(initial_buf)
                 move_selected(prompt_bufnr)
             end)
 
-            map("n", "y", function()
-                copy_selected(prompt_bufnr)
+            map("n", "s", function()
+                split_selected(prompt_bufnr, "rightbelow split")
+            end)
+
+            map("n", "v", function()
+                split_selected(prompt_bufnr, "rightbelow vsplit")
             end)
 
             return true
@@ -1063,6 +1042,17 @@ function M.pick(initial_buf)
     end
 
     vim.cmd("buffers")
+end
+
+function M.pick_current()
+    local current = vim.api.nvim_get_current_buf()
+
+    if valid_listed_buffer(current) then
+        M.pick(current)
+        return
+    end
+
+    M.pick()
 end
 
 function M.pick_tab_for_window()
@@ -1145,7 +1135,7 @@ function M.delete_current_to_hidden(force)
     return ok
 end
 
-function M.move_buffer_to_window(buf, target_win)
+local function move_buffer_between_windows(buf, source_win, target_win)
     if not movable_buffer(buf) then
         vim.notify("Buffer can't be moved", vim.log.levels.WARN)
         return false
@@ -1155,7 +1145,6 @@ function M.move_buffer_to_window(buf, target_win)
         return false
     end
 
-    local source_win = any_window_for_buffer(buf)
     local target_buf = vim.api.nvim_win_get_buf(target_win)
 
     if source_win and source_win == target_win then
@@ -1175,23 +1164,32 @@ function M.move_buffer_to_window(buf, target_win)
     return true
 end
 
-function M.copy_buffer_to_window(buf, target_win)
-    if not movable_buffer(buf) then
-        vim.notify("Buffer can't be copied", vim.log.levels.WARN)
+function M.move_buffer_to_window(buf, target_win)
+    return move_buffer_between_windows(buf, any_window_for_buffer(buf), target_win)
+end
+
+function M.move_current_to_window()
+    local buf = vim.api.nvim_get_current_buf()
+    local source_win = vim.api.nvim_get_current_win()
+    local original_tabpage = vim.api.nvim_get_current_tabpage()
+    local ok_picker, window_picker = pcall(require, "config.window_picker")
+
+    if not ok_picker then
         return false
     end
 
-    if not vim.api.nvim_win_is_valid(target_win) then
+    if not pick_tab_for_window() then
         return false
     end
 
-    if vim.api.nvim_win_get_buf(target_win) == buf then
-        return true
+    local target_win = window_picker.pick_window(window_picker_exclude)
+
+    if not target_win or target_win == -1 then
+        restore_tabpage(original_tabpage, source_win)
+        return false
     end
 
-    vim.api.nvim_win_set_buf(target_win, buf)
-
-    return true
+    return move_buffer_between_windows(buf, source_win, target_win)
 end
 
 function M.open_buffer_in_window(buf, target_win, opts)
@@ -1241,6 +1239,30 @@ function M.open_buffer_in_window(buf, target_win, opts)
     end
 
     vim.api.nvim_win_set_buf(target_win, buf)
+
+    return true
+end
+
+function M.open_buffer_in_split(buf, target_win, split_cmd)
+    if not movable_buffer(buf) then
+        vim.notify("Buffer can't be opened in split", vim.log.levels.WARN)
+        return false
+    end
+
+    if not vim.api.nvim_win_is_valid(target_win) then
+        return false
+    end
+
+    vim.api.nvim_set_current_win(target_win)
+
+    local ok, err = pcall(vim.cmd, split_cmd)
+
+    if not ok then
+        vim.notify(err, vim.log.levels.ERROR)
+        return false
+    end
+
+    vim.api.nvim_win_set_buf(0, buf)
 
     return true
 end

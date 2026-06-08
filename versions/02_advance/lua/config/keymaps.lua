@@ -61,6 +61,92 @@ local ignored_quit_filetypes = {
     notify = true,
 }
 
+local ignored_save_filetypes = {
+    FloatingTerminal = true,
+    NvimTree = true,
+    TelescopePreview = true,
+    TelescopePrompt = true,
+    TelescopeResults = true,
+    alpha = true,
+    lazygit = true,
+    notify = true,
+}
+
+local function restore_insert_mode(was_insert, buf)
+    if not was_insert then
+        return
+    end
+
+    vim.schedule(function()
+        if
+            vim.api.nvim_buf_is_valid(buf)
+            and vim.api.nvim_get_current_buf() == buf
+            and vim.api.nvim_get_mode().mode:sub(1, 1) ~= "i"
+        then
+            vim.cmd("startinsert")
+        end
+    end)
+end
+
+local function saveable_regular_buffer(buf)
+    return vim.api.nvim_buf_is_valid(buf)
+        and vim.bo[buf].buflisted
+        and vim.bo[buf].buftype == ""
+        and vim.bo[buf].modifiable
+        and not ignored_save_filetypes[vim.bo[buf].filetype]
+end
+
+local function prompt_saveas_name()
+    vim.fn.inputsave()
+    local ok, filename = pcall(vim.fn.input, "Save as: ", "", "file")
+    vim.fn.inputrestore()
+
+    if not ok then
+        return nil
+    end
+
+    filename = vim.trim(filename or "")
+
+    if filename == "" then
+        return nil
+    end
+
+    return filename
+end
+
+local function save_current_file()
+    local buf = vim.api.nvim_get_current_buf()
+    local was_insert = vim.api.nvim_get_mode().mode:sub(1, 1) == "i"
+
+    if not saveable_regular_buffer(buf) then
+        restore_insert_mode(was_insert, buf)
+        return
+    end
+
+    local name = vim.api.nvim_buf_get_name(buf)
+    local ok
+    local err
+
+    if name == "" then
+        local filename = prompt_saveas_name()
+
+        if not filename or vim.api.nvim_get_current_buf() ~= buf then
+            restore_insert_mode(was_insert, buf)
+            return
+        end
+
+        ok, err = pcall(vim.cmd, "saveas " .. vim.fn.fnameescape(filename))
+    else
+        ok, err = pcall(vim.cmd, "write")
+    end
+
+    if not ok then
+        vim.notify(err, vim.log.levels.ERROR)
+    end
+
+    restore_insert_mode(was_insert, buf)
+end
+
 local function is_ignored_quit_window(win)
     if not vim.api.nvim_win_is_valid(win) then
         return true
@@ -346,7 +432,13 @@ end, {
     desc = "Open settings",
 })
 
-vim.keymap.set("n", "<leader>bb", buffers.pick, {
+vim.keymap.set({ "n", "i" }, "<C-s>", save_current_file, {
+    noremap = true,
+    silent = true,
+    desc = "Save file",
+})
+
+vim.keymap.set("n", "<leader>bb", buffers.pick_current, {
     noremap = true,
     silent = true,
     desc = "Pick buffer",
@@ -362,6 +454,12 @@ vim.keymap.set("n", "<leader>bp", buffers.previous, {
     noremap = true,
     silent = true,
     desc = "Previous buffer",
+})
+
+vim.keymap.set("n", "<leader>bm", buffers.move_current_to_window, {
+    noremap = true,
+    silent = true,
+    desc = "Move current buffer to picked window",
 })
 
 vim.keymap.set("n", "<leader>bd", function()
