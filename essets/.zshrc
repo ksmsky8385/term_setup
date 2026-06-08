@@ -1,4 +1,16 @@
 # ==============================
+# PATH / Environment
+# ==============================
+
+
+
+# ==============================
+# Aliases
+# ==============================
+
+
+
+# ==============================
 # Powerlevel10k - before load
 # ==============================
 typeset -g POWERLEVEL9K_INSTANT_PROMPT=off
@@ -70,12 +82,6 @@ typeset -g POWERLEVEL9K_DIR_MIN_COMMAND_COLUMNS_PCT=0
 (( $+commands[p10k] )) && p10k reload
 
 # ==============================
-# Aliases
-# ==============================
-alias ccc="cc -Wall -Wextra -Werror"
-alias francinette="docker run -it --rm -v .:/src liqsuq/francinette"
-
-# ==============================
 # Terminal Intro
 # ==============================
 
@@ -84,7 +90,7 @@ __zsh_terminal_intro() {
 
   clear
 
-  local min_cols=50
+  local min_cols=75
   local min_lines=15
 
   if command -v fastfetch > /dev/null 2>&1 \
@@ -100,3 +106,10 @@ re() {
 }
 
 __zsh_terminal_intro
+
+# ==============================
+# Node / NVM
+# ==============================
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
