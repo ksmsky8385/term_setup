@@ -180,6 +180,7 @@ function M.open()
         "    Ctrl-n / Ctrl-p    자동완성 후보 이동",
         "    Enter              선택한 자동완성 후보 확정",
         "    Ctrl-e             자동완성 후보 닫기",
+        "    Insert Ctrl-l      다음 괄호/따옴표 밖으로 이동",
         "    Tab / Shift-Tab    스니펫 위치 이동",
         "    :SnippetSettings   스니펫 설정 메뉴",
         "    Custom snippets    stdpath(config)/snippets 에 작성",
