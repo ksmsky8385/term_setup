@@ -17,6 +17,30 @@ FASTFETCH_BIN="$LOCAL_BIN_DIR/fastfetch"
 echo "zsh 플러그인 설정 스크립트"
 echo
 
+ensure_local_bin_path() {
+    local shell_files=("$HOME/.zshrc" "$HOME/.bashrc")
+    
+    for rc in "${shell_files[@]}"; do
+        if [ -f "$rc" ]; then
+            if grep -q '\.local/bin' "$rc" 2>/dev/null; then
+                echo "설정 파일($rc)에 이미 .local/bin 관련 PATH 설정이 존재합니다."
+            else
+                printf '\n# User local binaries\n' >> "$rc"
+                printf 'export PATH="$HOME/.local/bin:$PATH"\n' >> "$rc"
+                echo "PATH 추가 완료: $rc"
+            fi
+        fi
+    done
+
+    case ":$PATH:" in
+        *:"$HOME/.local/bin":* | *:"$HOME/..local/bin":*)
+            ;;
+        *)
+            export PATH="$HOME/.local/bin:$PATH"
+            ;;
+    esac
+}
+
 download_file() {
     local url="$1"
     local output="$2"
@@ -95,6 +119,8 @@ install_fastfetch_local() {
 }
 
 install_plugins() {
+    ensure_local_bin_path
+    
     mkdir -p "$PLUGIN_DIR"
     mkdir -p "$THEME_DIR"
 

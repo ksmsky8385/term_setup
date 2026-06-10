@@ -5,6 +5,7 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ZSH_SCRIPT="$SCRIPT_DIR/scripts/zsh_setting_start.sh"
 NVIM_SCRIPT="$SCRIPT_DIR/scripts/nvim_setting_start.sh"
+AGENT_SCRIPT="$SCRIPT_DIR/scripts/agent_setting_start.sh"
 
 ask_yes_no() {
     local prompt="$1"
@@ -60,8 +61,12 @@ run_selected_setup() {
             run_script "$NVIM_SCRIPT" "nvim"
             ;;
         3)
+            run_script "$AGENT_SCRIPT" "agent"
+            ;;
+        4)
             run_script "$ZSH_SCRIPT" "zsh"
             run_script "$NVIM_SCRIPT" "nvim"
+            run_script "$AGENT_SCRIPT" "agent"
             ;;
         *)
             echo "Error: 알 수 없는 선택입니다."
@@ -76,8 +81,9 @@ show_menu() {
     echo "----------------------------------------------------"
     echo "1. zsh 설정"
     echo "2. nvim 설정"
-    echo "3. 전체 설정"
-    echo "4. 나가기"
+    echo "3. agent 설정"
+    echo "4. 전체 설정"
+    echo "5. 나가기"
     echo "----------------------------------------------------"
 }
 
@@ -87,7 +93,7 @@ while true; do
     read -r choice
 
     case "$choice" in
-        1 | 2 | 3)
+        1 | 2 | 3 | 4)
             if ask_yes_no "설정을 진행하겠습니까?"; then
                 if run_selected_setup "$choice"; then
                     echo
@@ -106,13 +112,14 @@ while true; do
                 exit 0
             fi
             ;;
-        4)
+        5)
             echo "프로그램을 종료합니다."
             exit 0
             ;;
         *)
-            echo "1부터 4 사이의 번호를 입력하세요."
+            echo "1부터 5 사이의 번호를 입력하세요."
             sleep 1
             ;;
     esac
 done
+
