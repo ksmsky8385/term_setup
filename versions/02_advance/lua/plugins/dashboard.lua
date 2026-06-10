@@ -142,7 +142,7 @@ return {
             end
 
             vim.api.nvim_echo({
-                { "Quit Neovim? Press Enter to confirm, Esc or any other key to cancel.", "WarningMsg" },
+                { "Quit Neovim? Press Enter, q, or Q to confirm; Esc or any other key cancels.", "WarningMsg" },
             }, false, {})
 
             local ok, input = pcall(vim.fn.getcharstr)
@@ -153,7 +153,7 @@ return {
                 return
             end
 
-            if input == "\13" or input == "\10" or input == "\r" then
+            if input == "\13" or input == "\10" or input == "\r" or input == "q" or input == "Q" then
                 vim.cmd("qa")
             end
         end
@@ -162,8 +162,8 @@ return {
 
         local dashboard_buttons = {
             dashboard.button("e", "   New file", ":ene <BAR> startinsert<CR>"),
-            dashboard.button("f", "󰈞   Find file", ":Telescope find_files<CR>"),
-            dashboard.button("g", "󱎸   Search text", ":Telescope live_grep<CR>"),
+            dashboard.button("f", "󰈞   Find file", ":FloatingFindFiles<CR>"),
+            dashboard.button("g", "󱎸   Search text", ":FloatingLiveGrep<CR>"),
             dashboard.button("w", "󰉋   Change workspace", ":WorkspacePick<CR>"),
             dashboard.button("t", "󰙅   Toggle tree", ":TreeToggle<CR>"),
             dashboard.button("s", "   Settings", ":Settings<CR>"),

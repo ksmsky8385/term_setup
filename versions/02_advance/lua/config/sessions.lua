@@ -336,6 +336,16 @@ local function current_tree_state()
     }
 end
 
+local function current_floating_slots()
+    local ok, floating = pcall(require, "config.floating")
+
+    if not ok or type(floating.current_slots) ~= "function" then
+        return {}
+    end
+
+    return floating.current_slots()
+end
+
 local function restore_terminals(terminals)
     if type(terminals) ~= "table" or #terminals == 0 then
         return
@@ -373,6 +383,26 @@ local function restore_terminals(terminals)
         end
 
         ::continue::
+    end
+end
+
+local function restore_floating_slots(floating_slots)
+    if type(floating_slots) ~= "table" or #floating_slots == 0 then
+        return
+    end
+
+    local ok, floating = pcall(require, "config.floating")
+
+    if not ok or type(floating.restore_slot) ~= "function" then
+        return
+    end
+
+    for _, item in ipairs(floating_slots) do
+        if type(item) == "table" then
+            pcall(floating.restore_slot, item.slot, item.file, {
+                visible = item.visible == true,
+            })
+        end
     end
 end
 
@@ -586,6 +616,7 @@ function M.save(slot, force, opts)
     metadata.cwd = vim.fn.getcwd()
     metadata.files = current_files()
     metadata.terminals = current_terminal_windows()
+    metadata.floating_slots = current_floating_slots()
     metadata.tree = current_tree_state()
     metadata.winrestcmd = vim.fn.winrestcmd()
     metadata.saved_at = os.date("%Y-%m-%d %H:%M:%S")
@@ -719,6 +750,7 @@ local function load_session(slot, path)
     vim.schedule(function()
         clear_missing_file_buffers()
         restore_terminals(metadata.terminals)
+        restore_floating_slots(metadata.floating_slots)
         restore_tree(metadata.tree)
 
         if type(metadata.winrestcmd) == "string" and metadata.winrestcmd ~= "" then
@@ -1054,6 +1086,7 @@ local function slot_entry(slot)
     local note = metadata.note or ""
     local files = metadata.files or {}
     local terminals = metadata.terminals or {}
+    local floating_slots = metadata.floating_slots or {}
     local tree = metadata.tree or {}
     local status = exists and "Saved session" or "Empty"
     local summary = note
@@ -1080,6 +1113,7 @@ local function slot_entry(slot)
         note = note,
         files = files,
         terminal_count = #terminals,
+        floating_slot_count = #floating_slots,
         tree_visible = tree.visible == true,
         path = path,
         label = exists
@@ -1100,6 +1134,7 @@ local function slot_entry(slot)
             name,
             note,
             table.concat(files, " "),
+            "floating_slots:" .. #floating_slots,
         }, " "),
     }
 end
@@ -1119,6 +1154,7 @@ local function preview_lines(entry)
         "Saved: " .. (entry.saved_at or "-"),
         "Cwd: " .. (entry.cwd ~= "" and entry.cwd or "-"),
         "Terminals: " .. entry.terminal_count,
+        "Floating slots: " .. entry.floating_slot_count,
         "Tree: " .. (entry.tree_visible and "visible" or "hidden"),
     }
 

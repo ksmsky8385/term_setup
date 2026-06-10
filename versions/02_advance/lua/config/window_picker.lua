@@ -110,6 +110,12 @@ local function is_excluded(win, exclude)
         return true
     end
 
+    local ok_floating, floating = pcall(require, "config.floating")
+
+    if ok_floating and floating.is_slot_window(win) then
+        return true
+    end
+
     local buf = vim.api.nvim_win_get_buf(win)
 
     for option, values in pairs(exclude or {}) do
@@ -162,6 +168,7 @@ function M.remember_window(win)
 
     if not is_excluded(win, {
         filetype = {
+            "FloatingSlot",
             "NvimTree",
             "notify",
         },
@@ -217,7 +224,9 @@ local function focusable_window(win)
 
     local buf = vim.api.nvim_win_get_buf(win)
 
-    return vim.bo[buf].filetype ~= "notify"
+    local filetype = vim.bo[buf].filetype
+
+    return filetype ~= "FloatingSlot" and filetype ~= "notify"
 end
 
 local function restore_picker(previous, laststatus, fillchars)

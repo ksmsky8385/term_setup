@@ -3,6 +3,8 @@ vim.keymap.set("t", "<Esc>", "<C-\\><C-n>", {
     silent = true,
 })
 
+local floating = require("config.floating")
+
 local function is_nvim_tree()
     return vim.bo.filetype == "NvimTree"
 end
@@ -23,12 +25,20 @@ local function is_empty_unlisted_buffer(buf)
 end
 
 local function vertical_split_or_empty()
+    if floating.reject_window_action() then
+        return
+    end
+
     require("config.window_picker").remember_window()
     vim.cmd("rightbelow vsplit")
     empty_unlisted_buffer()
 end
 
 local function horizontal_split_or_empty()
+    if floating.reject_window_action() then
+        return
+    end
+
     require("config.window_picker").remember_window()
     vim.cmd("rightbelow split")
     empty_unlisted_buffer()
@@ -167,6 +177,7 @@ local function close_target_window_count()
 
             if
                 filetype ~= "FloatingTerminal"
+                and filetype ~= "FloatingSlot"
                 and filetype ~= "NvimTree"
                 and filetype ~= "notify"
             then
@@ -245,6 +256,10 @@ end
 local function leader_quit(force)
     local current_win = vim.api.nvim_get_current_win()
     local current_buf = vim.api.nvim_get_current_buf()
+
+    if floating.close_current(force) then
+        return
+    end
 
     if force and vim.bo[current_buf].buftype == "terminal" then
         if terminal.is_float_terminal(current_buf) then
@@ -360,6 +375,16 @@ vim.keymap.set("n", "<leader>`", terminal.open_float_terminal, {
     desc = "Toggle floating terminal",
 })
 
+for slot = 0, 9 do
+    vim.keymap.set("n", "<leader>" .. slot, function()
+        floating.toggle(slot)
+    end, {
+        noremap = true,
+        silent = true,
+        desc = "Toggle floating slot " .. slot,
+    })
+end
+
 vim.keymap.set("n", "<leader><Tab><Tab>", tabs.pick, {
     noremap = true,
     silent = true,
@@ -456,13 +481,25 @@ vim.keymap.set("n", "<leader>bp", buffers.previous, {
     desc = "Previous buffer",
 })
 
-vim.keymap.set("n", "<leader>bm", buffers.move_current_to_window, {
+vim.keymap.set("n", "<leader>bm", function()
+    if floating.reject_window_action() then
+        return
+    end
+
+    buffers.move_current_to_window()
+end, {
     noremap = true,
     silent = true,
     desc = "Move current buffer to picked window",
 })
 
-vim.keymap.set("n", "<leader>bw", buffers.open_current_in_window, {
+vim.keymap.set("n", "<leader>bw", function()
+    if floating.reject_window_action() then
+        return
+    end
+
+    buffers.open_current_in_window()
+end, {
     noremap = true,
     silent = true,
     desc = "Show current buffer in picked window",

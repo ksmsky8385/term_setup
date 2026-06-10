@@ -31,12 +31,12 @@ local function mark_closing(buf)
 end
 
 local function shell_name()
-    return vim.fn.fnamemodify(vim.o.shell, ":t")
+    return vim.fn.fnamemodify(vim.o.shell, ":t"):gsub("%.exe$", "")
 end
 
 local function terminal_label(buf)
     if vim.b[buf].terminal_kind == FLOAT_TERMINAL_KIND then
-        return "[Floating]"
+        return "[FT]"
     end
 
     return "[Terminal]"
@@ -73,7 +73,7 @@ local function floating_terminal_config()
         col = math.floor((vim.o.columns - width) / 2),
         style = "minimal",
         border = "rounded",
-        title = " " .. shell_name() .. " [Floating] ",
+        title = " [FT] " .. shell_name() .. " [Terminal] ",
         title_pos = "center",
     }
 end
@@ -161,6 +161,10 @@ function M.is_float_terminal(buf)
         and vim.b[buf].terminal_kind == FLOAT_TERMINAL_KIND
 end
 
+function M.float_terminal_label()
+    return "FT"
+end
+
 function M.is_status_terminal()
     local win = vim.g.statusline_winid or vim.api.nvim_get_current_win()
     local buf = vim.api.nvim_win_get_buf(win)
@@ -176,7 +180,11 @@ function M.status_name()
         return ""
     end
 
-    return shell_name() .. " " .. terminal_label(buf)
+    if vim.b[buf].terminal_kind == FLOAT_TERMINAL_KIND then
+        return terminal_label(buf) .. " " .. shell_name() .. " [Terminal]"
+    end
+
+    return shell_name() .. " [Terminal]"
 end
 
 function M.create_buffer_terminal(opts)
@@ -223,6 +231,12 @@ function M.hide_float_terminal()
     refresh_tree()
 end
 
+function M.hide_float_terminal_if_visible()
+    if valid_window(float_terminal.win) then
+        M.hide_float_terminal()
+    end
+end
+
 function M.close_float_terminal(buf, win)
     buf = buf or float_terminal.buf
     win = win or float_terminal.win
@@ -259,6 +273,12 @@ function M.show_float_terminal(buf)
 
     if not M.valid_terminal(buf) then
         return false
+    end
+
+    local ok_floating, floating = pcall(require, "config.floating")
+
+    if ok_floating then
+        floating.hide_all()
     end
 
     if valid_window(float_terminal.win) then
@@ -342,6 +362,12 @@ function M.open_float_terminal()
     if valid_window(float_terminal.win) then
         M.hide_float_terminal()
         return
+    end
+
+    local ok_floating, floating = pcall(require, "config.floating")
+
+    if ok_floating then
+        floating.hide_all()
     end
 
     if M.show_float_terminal(float_terminal.buf) then

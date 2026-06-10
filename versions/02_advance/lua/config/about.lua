@@ -68,6 +68,7 @@ function M.open()
         "    Space tt           버퍼 터미널 생성",
         "    Space ts / tv      가로/세로 분할에 버퍼 터미널 생성",
         "    Space <Backtick>   플로팅 터미널 열기/숨기기",
+        "    Space 0~9          번호 플로팅 파일 슬롯 열기/숨기기",
         "",
         "  대시보드",
         "",
@@ -80,7 +81,7 @@ function M.open()
         "    a                  About Neovim 열기",
         "    q                  안전 종료 확인",
         "    Space q            직전 버퍼/터미널 복귀, 없으면 창 닫기 또는 종료",
-        "    Enter              blocker가 없을 때 Neovim 종료",
+        "    Enter / q / Q      blocker가 없을 때 Neovim 종료",
         "    Q                  blocker가 있을 때 강제 종료 확인",
         "    Esc / other key    종료 확인 취소",
         "    Space+버튼 키      전역 단축키가 없으면 대시보드 버튼 실행 방지",
@@ -185,13 +186,17 @@ function M.open()
         "    Snippet format     VSCode JSON snippets 형식",
         "    Space sr           custom snippets까지 다시 불러오기",
         "",
-        "  터미널",
+        "  터미널 / 플로팅",
         "",
         "    Space tt           현재 창에 버퍼 터미널 생성",
         "    Space ts           현재 창에서 가로 분할 후 버퍼 터미널 생성",
         "    Space tv           현재 창에서 세로 분할 후 버퍼 터미널 생성",
         "    Space Ctrl-q       현재 창 닫기",
         "    Space <Backtick>   플로팅 터미널 열기/숨기기",
+        "    Space 0~9          번호 플로팅 파일 슬롯 열기/숨기기",
+        "    플로팅 슬롯        [F1] 형식, 검색/grep 결과를 해당 슬롯에 열기",
+        "    전환 규칙          FT/F 슬롯은 하나만 표시, 새 슬롯을 열면 기존 슬롯 숨김",
+        "    Space q / Q        플로팅 슬롯 버퍼 닫기/강제 닫기",
         "    Esc                터미널 모드에서 노멀 모드로 전환",
         "    Space bb           터미널 버퍼 선택/이동/삭제",
         "    플로팅 터미널      Space bb에 표시, Enter로 플로팅 창 복귀",
@@ -316,6 +321,12 @@ function M.open()
         buffer = true,
         silent = true,
         desc = "Close About Neovim",
+    })
+
+    vim.keymap.set("n", "Q", ":bd!<CR>", {
+        buffer = true,
+        silent = true,
+        desc = "Force close About Neovim",
     })
 end
 

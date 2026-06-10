@@ -36,6 +36,7 @@ local window_picker_exclude = {
         "NvimTree",
         "notify",
         "FloatingTerminal",
+        "FloatingSlot",
     },
 }
 
@@ -135,8 +136,21 @@ local function visible_tab_labels_by_buffer()
     if ok_terminal then
         for _, buf in ipairs(listed_buffers()) do
             if terminal.is_float_terminal(buf) then
-                labels[buf] = "Floating"
+                labels[buf] = terminal.float_terminal_label()
                 max_width = math.max(max_width, #labels[buf])
+            end
+        end
+    end
+
+    local ok_floating, floating = pcall(require, "config.floating")
+
+    if ok_floating then
+        for _, buf in ipairs(listed_buffers()) do
+            local label = floating.slot_label_for_buffer(buf)
+
+            if label then
+                labels[buf] = label
+                max_width = math.max(max_width, #label)
             end
         end
     end
@@ -241,6 +255,77 @@ local function selected_buffer(prompt_bufnr)
     return selection.bufnr
 end
 
+local function sorted_buffer_numbers()
+    local bufnrs = vim.tbl_filter(function(buf)
+        return valid_listed_buffer(buf)
+    end, vim.api.nvim_list_bufs())
+
+    local ok_floating, floating = pcall(require, "config.floating")
+
+    table.sort(bufnrs, function(a, b)
+        local a_rank
+        local b_rank
+
+        if buffer_terminal_kind(a) == "float" then
+            a_rank = 0
+        elseif ok_floating then
+            local rank = floating.slot_sort_rank(a)
+
+            if rank then
+                a_rank = rank
+            end
+        end
+
+        if buffer_terminal_kind(b) == "float" then
+            b_rank = 0
+        elseif ok_floating then
+            local rank = floating.slot_sort_rank(b)
+
+            if rank then
+                b_rank = rank
+            end
+        end
+
+        if a_rank and b_rank and a_rank ~= b_rank then
+            return a_rank < b_rank
+        end
+
+        if a_rank ~= b_rank then
+            return a_rank ~= nil
+        end
+
+        return a < b
+    end)
+
+    return bufnrs
+end
+
+local function next_buffer_after_deleted(buf)
+    local before = sorted_buffer_numbers()
+    local deleted_index = nil
+
+    for index, candidate in ipairs(before) do
+        if candidate == buf then
+            deleted_index = index
+            break
+        end
+    end
+
+    if not deleted_index then
+        return nil
+    end
+
+    local after = vim.tbl_filter(function(candidate)
+        return candidate ~= buf and valid_listed_buffer(candidate)
+    end, sorted_buffer_numbers())
+
+    if #after == 0 then
+        return nil
+    end
+
+    return after[math.min(deleted_index, #after)]
+end
+
 local function close_picker(prompt_bufnr)
     local ok_actions, actions = pcall(require, "telescope.actions")
 
@@ -333,9 +418,20 @@ movable_buffer = function(buf)
         return false
     end
 
+    local ok_floating, floating = pcall(require, "config.floating")
+
+    if ok_floating and floating.is_slot_buffer(buf) then
+        return false
+    end
+
     local filetype = vim.bo[buf].filetype
 
-    if filetype == "NvimTree" or filetype == "alpha" or filetype == "notify" then
+    if
+        filetype == "NvimTree"
+        or filetype == "alpha"
+        or filetype == "notify"
+        or filetype == "FloatingSlot"
+    then
         return false
     end
 
@@ -424,6 +520,7 @@ local function target_window_count(tabpage)
 
             if
                 filetype ~= "FloatingTerminal"
+                and filetype ~= "FloatingSlot"
                 and filetype ~= "NvimTree"
                 and filetype ~= "TelescopePrompt"
                 and filetype ~= "TelescopeResults"
@@ -684,6 +781,12 @@ local function open_selected(prompt_bufnr)
         return
     end
 
+    local ok_floating, floating = pcall(require, "config.floating")
+
+    if ok_floating and floating.show_buffer_slot(buf) then
+        return
+    end
+
     if existing_win and vim.api.nvim_win_is_valid(existing_win) then
         vim.api.nvim_set_current_win(existing_win)
         return
@@ -717,6 +820,8 @@ local function delete_selected(prompt_bufnr, force)
         return
     end
 
+    local next_buf = next_buffer_after_deleted(buf)
+
     if
         not confirm_action(
             string.format(
@@ -741,7 +846,9 @@ local function delete_selected(prompt_bufnr, force)
     end
 
     close_picker(prompt_bufnr)
-    vim.schedule(M.pick)
+    vim.schedule(function()
+        M.pick(next_buf)
+    end)
 end
 
 local function delete_others_except(buf, force, opts)
@@ -932,25 +1039,12 @@ local function buffer_picker(initial_buf)
     local finders = require("telescope.finders")
     local conf = require("telescope.config").values
 
-    local bufnrs = vim.tbl_filter(function(buf)
-        return valid_listed_buffer(buf)
-    end, vim.api.nvim_list_bufs())
+    local bufnrs = sorted_buffer_numbers()
 
     if not next(bufnrs) then
         vim.notify("No buffers found", vim.log.levels.INFO)
         return
     end
-
-    table.sort(bufnrs, function(a, b)
-        local a_float = buffer_terminal_kind(a) == "float"
-        local b_float = buffer_terminal_kind(b) == "float"
-
-        if a_float ~= b_float then
-            return a_float
-        end
-
-        return a < b
-    end)
 
     local buffers = {}
     local default_selection_index = nil
