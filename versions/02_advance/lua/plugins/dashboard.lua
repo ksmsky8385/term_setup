@@ -262,13 +262,27 @@ return {
                 return false
             end
 
-            return vim.api.nvim_buf_is_valid(buf)
-                and vim.bo[buf].buflisted
-                and vim.bo[buf].buftype == ""
-                and vim.bo[buf].filetype ~= "FloatingTerminal"
-                and vim.bo[buf].filetype ~= "alpha"
-                and vim.bo[buf].filetype ~= "NvimTree"
-                and vim.bo[buf].filetype ~= "notify"
+            if not vim.api.nvim_buf_is_valid(buf) or not vim.bo[buf].buflisted then
+                return false
+            end
+
+            local filetype = vim.bo[buf].filetype
+
+            if filetype == "alpha" or filetype == "NvimTree" or filetype == "notify" then
+                return false
+            end
+
+            local buftype = vim.bo[buf].buftype
+
+            if buftype == "" then
+                return true
+            end
+
+            if buftype == "terminal" then
+                return true
+            end
+
+            return false
         end
 
         local function is_dashboard_buffer(buf)
