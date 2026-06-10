@@ -6,6 +6,28 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ZSH_SCRIPT="$SCRIPT_DIR/scripts/zsh_setting_start.sh"
 NVIM_SCRIPT="$SCRIPT_DIR/scripts/nvim_setting_start.sh"
 AGENT_SCRIPT="$SCRIPT_DIR/scripts/agent_setting_start.sh"
+USER_PATH_LINE='export PATH="$HOME/bin:$HOME/.local/bin:/usr/local/bin:$PATH"'
+
+ensure_user_path() {
+    local shell_files=("$HOME/.zshrc" "$HOME/.bashrc")
+    local rc
+
+    for rc in "${shell_files[@]}"; do
+        if [ ! -f "$rc" ]; then
+            continue
+        fi
+
+        if grep -Fxq "$USER_PATH_LINE" "$rc" 2>/dev/null; then
+            echo "설정 파일($rc)에 PATH 설정이 이미 존재합니다."
+        else
+            printf '\n# User local binaries\n' >> "$rc"
+            printf '%s\n' "$USER_PATH_LINE" >> "$rc"
+            echo "PATH 추가 완료: $rc"
+        fi
+    done
+
+    export PATH="$HOME/bin:$HOME/.local/bin:/usr/local/bin:$PATH"
+}
 
 ask_yes_no() {
     local prompt="$1"
@@ -95,6 +117,8 @@ while true; do
     case "$choice" in
         1 | 2 | 3 | 4)
             if ask_yes_no "설정을 진행하겠습니까?"; then
+                ensure_user_path
+
                 if run_selected_setup "$choice"; then
                     echo
                     echo "선택한 설정이 완료되었습니다."
@@ -122,4 +146,3 @@ while true; do
             ;;
     esac
 done
-

@@ -57,6 +57,7 @@ function M.open()
         "    실패 시            목록을 유지하고 오류 메시지 표시",
         "    Space bn / bp      다음/이전 버퍼",
         "    Space bm           현재 버퍼를 선택 윈도우로 이동/교체",
+        "    Space bw           현재 버퍼를 선택 윈도우에 표시",
         "    Space bd / bD      현재 버퍼 닫기/강제 닫기",
         "    Space bo / bO      다른 버퍼 닫기/강제 닫기",
         "    Space pp           세션 목록",

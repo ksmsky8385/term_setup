@@ -200,6 +200,8 @@ local function clear_prompt()
     if vim.opt.cmdheight._value ~= 0 then
         vim.cmd("normal! :")
     end
+
+    vim.cmd("redraw")
 end
 
 local function focusable_window(win)
@@ -239,10 +241,12 @@ function M.pick_window(exclude)
     local selectable = M.selectable_windows(exclude)
 
     if #selectable == 0 then
+        clear_prompt()
         return -1
     end
 
     if #selectable == 1 then
+        clear_prompt()
         return selectable[1]
     end
 

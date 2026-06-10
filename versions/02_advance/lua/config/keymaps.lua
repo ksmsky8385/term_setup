@@ -462,6 +462,12 @@ vim.keymap.set("n", "<leader>bm", buffers.move_current_to_window, {
     desc = "Move current buffer to picked window",
 })
 
+vim.keymap.set("n", "<leader>bw", buffers.open_current_in_window, {
+    noremap = true,
+    silent = true,
+    desc = "Show current buffer in picked window",
+})
+
 vim.keymap.set("n", "<leader>bd", function()
     buffers.delete_current(false)
 end, {

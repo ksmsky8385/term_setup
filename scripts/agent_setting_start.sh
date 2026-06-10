@@ -1,4 +1,3 @@
-```bash
 #!/usr/bin/env bash
 
 set -e
@@ -17,30 +16,6 @@ confirm() {
         *)
             echo "취소했습니다."
             return 1
-            ;;
-    esac
-}
-
-ensure_local_bin_path() {
-    local shell_files=("$HOME/.zshrc" "$HOME/.bashrc")
-
-    for rc in "${shell_files[@]}"; do
-        if [ -f "$rc" ]; then
-            if grep -q '\.local/bin' "$rc" 2>/dev/null; then
-                echo "설정 파일($rc)에 이미 .local/bin 관련 PATH 설정이 존재합니다."
-            else
-                printf '\n# User local binaries\n' >> "$rc"
-                printf 'export PATH="$HOME/.local/bin:$PATH"\n' >> "$rc"
-                echo "PATH 추가 완료: $rc"
-            fi
-        fi
-    done
-
-    case ":$PATH:" in
-        *:"$HOME/.local/bin":*)
-            ;;
-        *)
-            export PATH="$HOME/.local/bin:$PATH"
             ;;
     esac
 }
@@ -188,15 +163,12 @@ main_menu() {
             delete_menu
             ;;
         1 | 01)
-            ensure_local_bin_path
             install_antigravity
             ;;
         2 | 02)
-            ensure_local_bin_path
             install_codex
             ;;
         3 | 03)
-            ensure_local_bin_path
             install_antigravity
             install_codex
             ;;
@@ -208,5 +180,3 @@ main_menu() {
 }
 
 main_menu
-```
-

@@ -1192,6 +1192,35 @@ function M.move_current_to_window()
     return move_buffer_between_windows(buf, source_win, target_win)
 end
 
+function M.open_current_in_window()
+    local buf = vim.api.nvim_get_current_buf()
+    local original_win = vim.api.nvim_get_current_win()
+    local original_tabpage = vim.api.nvim_get_current_tabpage()
+    local ok_picker, window_picker = pcall(require, "config.window_picker")
+
+    if not movable_buffer(buf) then
+        vim.notify("Buffer can't be opened in window", vim.log.levels.WARN)
+        return false
+    end
+
+    if not ok_picker then
+        return false
+    end
+
+    if not pick_tab_for_window() then
+        return false
+    end
+
+    local target_win = window_picker.pick_window(window_picker_exclude)
+
+    if not target_win or target_win == -1 then
+        restore_tabpage(original_tabpage, original_win)
+        return false
+    end
+
+    return M.open_buffer_in_window(buf, target_win)
+end
+
 function M.open_buffer_in_window(buf, target_win, opts)
     opts = opts or {}
 

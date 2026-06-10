@@ -10,30 +10,6 @@ LOCAL_D2CODING_DIR="$LOCAL_FONT_DIR/D2Coding"
 SOURCE_FONT_DIR="$ROOT_DIR/fonts"
 SOURCE_D2CODING_DIR="$SOURCE_FONT_DIR/D2Coding"
 
-ensure_local_bin_path() {
-    local shell_files=("$HOME/.zshrc" "$HOME/.bashrc")
-    
-    for rc in "${shell_files[@]}"; do
-        if [ -f "$rc" ]; then
-            if grep -q '\.local/bin' "$rc" 2>/dev/null; then
-                echo "설정 파일($rc)에 이미 .local/bin 관련 PATH 설정이 존재합니다."
-            else
-                printf '\n# User local binaries\n' >> "$rc"
-                printf 'export PATH="$HOME/.local/bin:$PATH"\n' >> "$rc"
-                echo "PATH 추가 완료: $rc"
-            fi
-        fi
-    done
-
-    case ":$PATH:" in
-        *:"$HOME/.local/bin":* | *:"$HOME/..local/bin":*)
-            ;;
-        *)
-            export PATH="$HOME/.local/bin:$PATH"
-            ;;
-    esac
-}
-
 echo "NeoVim 환경설정 시작"
 echo
 
@@ -190,7 +166,6 @@ read -r confirm
 
 case "$confirm" in
     "" | "y" | "Y" | "yes" | "YES")
-        ensure_local_bin_path
         rm -rf ~/.cache/nvim
         rm -rf ~/.config/nvim
 
