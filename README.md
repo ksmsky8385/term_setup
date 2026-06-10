@@ -23,6 +23,7 @@ sudo 권한 없이 사용자 홈 디렉토리 아래에 설치되는 구성을 �
 `launch.sh`는 `scripts/` 안의 설정 스크립트를 실행합니다.
 
 - `scripts/zsh_setting_start.sh`
+  - Oh My Zsh가 없으면 먼저 `~/.oh-my-zsh`에 설치합니다.
   - Oh My Zsh custom 경로에 zsh 플러그인과 Powerlevel10k를 설치합니다.
   - fastfetch를 `~/.local/bin/fastfetch`에 사용자 로컬로 설치합니다.
   - fastfetch 기본 설정이 없으면 `~/.config/fastfetch/config.jsonc`를 생성합니다.
@@ -37,6 +38,7 @@ sudo 권한 없이 사용자 홈 디렉토리 아래에 설치되는 구성을 �
 zsh 설정에서 설치되는 항목:
 
 ```text
+~/.oh-my-zsh
 ~/.oh-my-zsh/custom/plugins/zsh-autosuggestions
 ~/.oh-my-zsh/custom/plugins/zsh-syntax-highlighting
 ~/.oh-my-zsh/custom/themes/powerlevel10k

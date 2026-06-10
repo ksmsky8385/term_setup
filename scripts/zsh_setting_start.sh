@@ -2,7 +2,8 @@
 
 set -e
 
-ZSH_CUSTOM="$HOME/.oh-my-zsh/custom"
+ZSH_DIR="$HOME/.oh-my-zsh"
+ZSH_CUSTOM="$ZSH_DIR/custom"
 PLUGIN_DIR="$ZSH_CUSTOM/plugins"
 THEME_DIR="$ZSH_CUSTOM/themes"
 
@@ -29,6 +30,33 @@ download_file() {
         echo "Error: curl 또는 wget이 필요합니다."
         return 1
     fi
+}
+
+install_oh_my_zsh() {
+    local installer_url
+    local tmp_dir
+    local installer
+
+    if [ -d "$ZSH_DIR" ]; then
+        echo "Oh My Zsh가 이미 설치되어 있습니다: $ZSH_DIR"
+        return 0
+    fi
+
+    installer_url="https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh"
+    tmp_dir="$(mktemp -d)"
+    installer="$tmp_dir/oh-my-zsh-install.sh"
+
+    echo "Oh My Zsh 설치 상태를 확인합니다."
+    echo "Oh My Zsh를 먼저 설치합니다."
+
+    if ! download_file "$installer_url" "$installer"; then
+        echo "Oh My Zsh 설치 스크립트 다운로드에 실패했습니다."
+        rm -rf "$tmp_dir"
+        return 1
+    fi
+
+    RUNZSH=no CHSH=no KEEP_ZSHRC=yes sh "$installer"
+    rm -rf "$tmp_dir"
 }
 
 fastfetch_asset_name() {
@@ -94,7 +122,44 @@ install_fastfetch_local() {
     echo "fastfetch 설치 완료: $FASTFETCH_BIN"
 }
 
+set_default_shell_to_zsh() {
+    local zsh_path
+    local current_shell
+
+    zsh_path="$(command -v zsh)"
+
+    if [ -z "$zsh_path" ]; then
+        echo "zsh를 찾을 수 없습니다."
+        return 1
+    fi
+
+    current_shell="$(getent passwd "$USER" | cut -d: -f7)"
+
+    if [ "$current_shell" = "$zsh_path" ]; then
+        echo "기본 쉘이 이미 zsh입니다."
+        return 0
+    fi
+
+    echo
+    printf "기본 쉘을 zsh로 변경하시겠습니까? [Y/n] "
+    read -r confirm
+
+    case "$confirm" in
+        "" | y | Y | yes | YES)
+            chsh -s "$zsh_path"
+            echo
+            echo "기본 쉘을 zsh로 변경했습니다."
+            echo "다음 로그인부터 적용됩니다."
+            ;;
+        *)
+            echo "쉘 변경을 건너뜁니다."
+            ;;
+    esac
+}
+
 install_plugins() {
+    install_oh_my_zsh
+
     mkdir -p "$PLUGIN_DIR"
     mkdir -p "$THEME_DIR"
 
@@ -173,7 +238,7 @@ EOF
 }
 
 reset_plugins() {
-    echo "설치한 zsh 플러그인/테마를 삭제합니다."
+    echo "설치한 Oh My Zsh와 zsh 플러그인/테마를 삭제합니다."
     echo ".zshrc, .bashrc, .p10k.zsh, fastfetch 설정 파일은 수정하지 않습니다."
     echo
     printf "진행하시겠습니까? [Y/n] "
@@ -181,13 +246,14 @@ reset_plugins() {
 
     case "$confirm" in
         "" | "y" | "Y" | "yes" | "YES")
+            rm -rf "$ZSH_DIR"
             rm -rf "$AUTOSUGGESTIONS_DIR"
             rm -rf "$SYNTAX_HIGHLIGHTING_DIR"
             rm -rf "$POWERLEVEL10K_DIR"
             rm -f "$FASTFETCH_BIN"
             rm -f "$HOME"/.zcompdump*
 
-            echo "플러그인 삭제 완료"
+            echo "Oh My Zsh와 플러그인 삭제 완료"
             ;;
         "n" | "N" | "no" | "NO")
             echo "삭제를 취소했습니다."
@@ -199,18 +265,57 @@ reset_plugins() {
     esac
 }
 
-echo "00. 설치한 플러그인 삭제"
-echo "01. 플러그인 설치"
+set_default_shell_to_bash() {
+    local bash_path
+    local current_shell
+    local confirm
+
+    bash_path="$(command -v bash)"
+
+    if [ -z "$bash_path" ]; then
+        echo "bash를 찾을 수 없습니다."
+        return 1
+    fi
+
+    current_shell="$(getent passwd "$USER" | cut -d: -f7)"
+
+    if [ "$current_shell" = "$bash_path" ]; then
+        echo "기본 쉘이 이미 bash입니다."
+        return 0
+    fi
+
+    echo
+    printf "기본 쉘을 bash로 되돌리겠습니까? [Y/n] "
+    read -r confirm
+
+    case "$confirm" in
+        "" | y | Y | yes | YES)
+            if chsh -s "$bash_path"; then
+                echo "기본 쉘을 bash로 변경했습니다."
+                echo "다음 로그인부터 적용됩니다."
+            else
+                echo "기본 쉘 변경에 실패했습니다."
+                return 1
+            fi
+            ;;
+        *)
+            echo "쉘 변경을 건너뜁니다."
+            ;;
+    esac
+}
+
+echo "00. 설치한 Oh My Zsh/플러그인 삭제"
+echo "01. Oh My Zsh/플러그인 설치"
 echo
 printf "> "
 read -r choice
 
 case "$choice" in
     0 | 00)
-        reset_plugins
+        reset_plugins && set_default_shell_to_bash
         ;;
     1 | 01)
-        install_plugins
+        install_plugins && set_default_shell_to_zsh
         ;;
     *)
         echo "Error: 0 또는 1을 입력하세요."
