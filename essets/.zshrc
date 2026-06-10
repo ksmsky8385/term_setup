@@ -1,4 +1,22 @@
 # ==============================
+# Aliases
+# ==============================
+alias ccc="cc -Wall -Wextra -Werror"
+alias francinette="docker run -it --rm -v .:/src liqsuq/francinette"
+alias v="nvim"
+
+# ==============================
+# PATH / Environment
+# ==============================
+export PATH="$HOME/.local/bin:$PATH"
+export LD_LIBRARY_PATH="$HOME/.local/lib:$LD_LIBRARY_PATH"
+export HOME_MAX_SIZE=5
+export SGOINFRE_MAX_SIZE=42
+export SGOINFRE="/sgoinfre/seunkang"
+export NAME="YOUR_ID"
+export MAIL="YOUR_ID@student.42gyeongsan.kr"
+
+# ==============================
 # Powerlevel10k - before load
 # ==============================
 typeset -g POWERLEVEL9K_INSTANT_PROMPT=off
@@ -96,21 +114,8 @@ re() {
 __zsh_terminal_intro
 
 # ==============================
-# Node / NVM
+# Node / NVM (nvm 설치 후 정리하세요.)
 # ==============================
-export NVM_DIR="$HOME/.nvm"
-[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
-
-# ==============================
-# PATH / Environment
-# ==============================
-
-
-
-# ==============================
-# Aliases
-# ==============================
-
-
-
+# export NVM_DIR="$HOME/.nvm"
+# [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+# [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"

@@ -6,7 +6,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ZSH_SCRIPT="$SCRIPT_DIR/scripts/zsh_setting_start.sh"
 NVIM_SCRIPT="$SCRIPT_DIR/scripts/nvim_setting_start.sh"
 AGENT_SCRIPT="$SCRIPT_DIR/scripts/agent_setting_start.sh"
-USER_PATH_LINE='export PATH="$HOME/bin:$HOME/.local/bin:/usr/local/bin:$PATH"'
+USER_PATH_LINE='export PATH="$HOME/.local/bin:$PATH"'
 
 ensure_user_path() {
     local shell_files=("$HOME/.zshrc" "$HOME/.bashrc")

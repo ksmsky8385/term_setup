@@ -45,6 +45,39 @@ zsh 설정에서 설치되는 항목:
 
 Neovim 설정은 `versions/` 아래의 설정 폴더를 선택해 설치합니다.
 
+## Node.js가 필요한 경우
+
+NeoVim의 `versions/02_advance`처럼 Mason/LSP 플러그인을 사용하는 설정 버전은 일부 LSP 서버 설치와 실행에 Node.js가 필요할 수 있습니다. 예를 들어 `pyright`, `bashls`, `jsonls`, `yamlls`, `vimls` 같은 서버는 Mason에서 Node.js/npm 기반 패키지로 설치되는 경우가 많습니다.
+
+42 클러스터처럼 sudo 권한 없이 사용자 홈 디렉토리에 설치해야 하는 환경에서는 `nvm`으로 Node.js를 설치하는 방식을 권장합니다.
+
+```sh
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.5/install.sh | bash
+```
+
+설치 후 현재 쉘에 바로 적용합니다.
+
+```sh
+source ~/.zshrc
+```
+
+`nvm`이 정상적으로 로드되는지 확인합니다.
+
+```sh
+command -v nvm
+```
+
+Node.js LTS 버전을 설치하고 기본 버전으로 지정합니다.
+
+```sh
+nvm install --lts
+nvm alias default 'lts/*'
+node -v
+npm -v
+```
+
+이후 Neovim에서 `:LSPSettings`, `:LSP Install`로 Node.js 기반 LSP 서버를 설치하면 됩니다.
+
 ## 기본 설정 파일
 
 설치 후 기본값을 사용하고 싶으면 `essets/` 폴더의 파일을 홈 디렉토리에 적용하면 됩니다.
