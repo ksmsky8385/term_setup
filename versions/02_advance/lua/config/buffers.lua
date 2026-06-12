@@ -498,7 +498,7 @@ local function first_selectable_window_for_buffer(buf)
     return window_for_buffer(buf)
 end
 
-local function fallback_buffer_for_displaced(buf)
+local function fallback_buffer_for_displaced()
     return vim.api.nvim_create_buf(true, false)
 end
 
@@ -1249,7 +1249,7 @@ local function move_buffer_between_windows(buf, source_win, target_win)
         if movable_buffer(target_buf) then
             vim.api.nvim_win_set_buf(source_win, target_buf)
         else
-            vim.api.nvim_win_set_buf(source_win, fallback_buffer_for_displaced(target_buf))
+            vim.api.nvim_win_set_buf(source_win, fallback_buffer_for_displaced())
         end
     end
 

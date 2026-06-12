@@ -1,14 +1,64 @@
 local local_bin = vim.fn.expand("~/.local/bin")
-vim.fn.mkdir(local_bin, "p")
 
-if not string.find(vim.env.PATH, local_bin, 1, true) then
-    vim.env.PATH = local_bin .. ":" .. vim.env.PATH
+local function notify_error(message)
+    vim.notify(message, vim.log.levels.ERROR)
+end
+
+local function executable(command)
+    return vim.fn.executable(command) == 1
+end
+
+local function ensure_command(command, package_name)
+    if executable(command) then
+        return true
+    end
+
+    notify_error((package_name or command) .. " 설치에 필요한 명령을 찾지 못했습니다: " .. command)
+    return false
+end
+
+local function ensure_dir(path, label)
+    local ok, result = pcall(vim.fn.mkdir, path, "p")
+
+    if ok and result ~= 0 then
+        return true
+    end
+
+    notify_error((label or path) .. " 디렉터리를 만들 수 없습니다: " .. path)
+    return false
+end
+
+local function path_contains(path)
+    for entry in string.gmatch(vim.env.PATH or "", "[^:]+") do
+        if entry == path then
+            return true
+        end
+    end
+
+    return false
+end
+
+ensure_dir(local_bin, "local bin")
+
+if not path_contains(local_bin) then
+    local path = vim.env.PATH or ""
+    vim.env.PATH = path == "" and local_bin or (local_bin .. ":" .. path)
 end
 
 local function ensure_rg()
     local rg_path = local_bin .. "/rg"
 
-    if vim.fn.executable(rg_path) == 1 then
+    if executable("rg") or executable(rg_path) then
+        return
+    end
+
+    if
+        not ensure_dir(local_bin, "rg")
+        or not ensure_command("curl", "rg")
+        or not ensure_command("tar", "rg")
+        or not ensure_command("cp", "rg")
+        or not ensure_command("chmod", "rg")
+    then
         return
     end
 
@@ -27,7 +77,7 @@ local function ensure_rg()
 
     local curl_result = vim.fn.system({
         "curl",
-        "-L",
+        "-fL",
         url,
         "-o",
         tar_path,
@@ -37,6 +87,8 @@ local function ensure_rg()
         vim.notify("rg 다운로드 실패: " .. curl_result, vim.log.levels.ERROR)
         return
     end
+
+    vim.fn.delete(extract_dir, "rf")
 
     local tar_result = vim.fn.system({
         "tar",
@@ -51,6 +103,11 @@ local function ensure_rg()
         return
     end
 
+    if vim.fn.filereadable(extract_dir .. "/rg") == 0 then
+        notify_error("rg 압축 해제 결과 파일을 찾지 못했습니다: " .. extract_dir .. "/rg")
+        return
+    end
+
     local cp_result = vim.fn.system({
         "cp",
         extract_dir .. "/rg",
@@ -62,11 +119,21 @@ local function ensure_rg()
         return
     end
 
-    vim.fn.system({
+    local chmod_result = vim.fn.system({
         "chmod",
         "+x",
         rg_path,
     })
+
+    if vim.v.shell_error ~= 0 then
+        notify_error("rg 실행 권한 설정 실패: " .. chmod_result)
+        return
+    end
+
+    if not executable(rg_path) then
+        notify_error("rg 설치 후 실행 파일 확인 실패: " .. rg_path)
+        return
+    end
 
     vim.notify("rg 설치 완료: " .. rg_path)
 end
@@ -111,7 +178,17 @@ end
 local function ensure_lazygit()
     local lazygit_path = local_bin .. "/lazygit"
 
-    if vim.fn.executable("lazygit") == 1 or vim.fn.executable(lazygit_path) == 1 then
+    if executable("lazygit") or executable(lazygit_path) then
+        return
+    end
+
+    if
+        not ensure_dir(local_bin, "lazygit")
+        or not ensure_command("curl", "lazygit")
+        or not ensure_command("tar", "lazygit")
+        or not ensure_command("cp", "lazygit")
+        or not ensure_command("chmod", "lazygit")
+    then
         return
     end
 
@@ -130,7 +207,7 @@ local function ensure_lazygit()
 
     local curl_result = vim.fn.system({
         "curl",
-        "-L",
+        "-fL",
         url,
         "-o",
         tar_path,
@@ -141,7 +218,11 @@ local function ensure_lazygit()
         return
     end
 
-    vim.fn.mkdir(extract_dir, "p")
+    vim.fn.delete(extract_dir, "rf")
+
+    if not ensure_dir(extract_dir, "lazygit extract") then
+        return
+    end
 
     local tar_result = vim.fn.system({
         "tar",
@@ -156,6 +237,11 @@ local function ensure_lazygit()
         return
     end
 
+    if vim.fn.filereadable(extract_dir .. "/lazygit") == 0 then
+        notify_error("lazygit 압축 해제 결과 파일을 찾지 못했습니다: " .. extract_dir .. "/lazygit")
+        return
+    end
+
     local cp_result = vim.fn.system({
         "cp",
         extract_dir .. "/lazygit",
@@ -167,11 +253,21 @@ local function ensure_lazygit()
         return
     end
 
-    vim.fn.system({
+    local chmod_result = vim.fn.system({
         "chmod",
         "+x",
         lazygit_path,
     })
+
+    if vim.v.shell_error ~= 0 then
+        notify_error("lazygit 실행 권한 설정 실패: " .. chmod_result)
+        return
+    end
+
+    if not executable(lazygit_path) then
+        notify_error("lazygit 설치 후 실행 파일 확인 실패: " .. lazygit_path)
+        return
+    end
 
     vim.notify("lazygit 설치 완료: " .. lazygit_path)
 end

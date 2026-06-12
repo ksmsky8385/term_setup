@@ -418,20 +418,6 @@ function M.slot_label_for_buffer(buf)
     return nil
 end
 
-function M.slot_display_name(buf)
-    if not valid_buffer(buf) or not M.slot_label_for_buffer(buf) then
-        return nil
-    end
-
-    local name = vim.api.nvim_buf_get_name(buf)
-
-    if name == "" then
-        return "[No Name]"
-    end
-
-    return vim.fn.fnamemodify(name, ":t")
-end
-
 function M.slot_sort_rank(buf)
     if not valid_buffer(buf) then
         return nil

@@ -205,7 +205,6 @@ function M.create_buffer_terminal(opts)
     local terminal_buf = vim.api.nvim_get_current_buf()
 
     vim.b[terminal_buf].terminal_kind = BUFFER_TERMINAL_KIND
-    vim.b[terminal_buf].terminal_previous_buf = vim.fn.bufnr("#")
     vim.bo[terminal_buf].buflisted = true
 
     if vim.b[terminal_buf].terminal_job_id then
