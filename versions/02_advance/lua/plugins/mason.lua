@@ -13,6 +13,7 @@ return {
         },
         config = function()
             local lsp_servers = require("config.lsp_servers")
+            local telescope_picker = require("config.picker")
             local package_fallbacks = {
                 bashls = "bash-language-server",
                 clangd = "clangd",
@@ -44,70 +45,8 @@ return {
                 return mason_lspconfig
             end
 
-            local function load_telescope()
-                local ok, telescope = pcall(function()
-                    return {
-                        actions = require("telescope.actions"),
-                        action_state = require("telescope.actions.state"),
-                        conf = require("telescope.config").values,
-                        finders = require("telescope.finders"),
-                        pickers = require("telescope.pickers"),
-                    }
-                end)
-
-                if not ok then
-                    vim.notify(
-                        "telescope.nvim is not available",
-                        vim.log.levels.ERROR
-                    )
-                    return nil
-                end
-
-                return telescope
-            end
-
             local function picker(title, entries)
-                local telescope = load_telescope()
-
-                if not telescope then
-                    return
-                end
-
-                telescope.pickers
-                    .new({}, {
-                        prompt_title = title,
-                        finder = telescope.finders.new_table({
-                            results = entries,
-                            entry_maker = function(entry)
-                                return {
-                                    value = entry,
-                                    display = entry.label,
-                                    ordinal = entry.ordinal or entry.label,
-                                }
-                            end,
-                        }),
-                        sorter = telescope.conf.generic_sorter({}),
-                        previewer = false,
-                        attach_mappings = function(prompt_bufnr)
-                            telescope.actions.select_default:replace(function()
-                                local selected =
-                                    telescope.action_state.get_selected_entry()
-
-                                telescope.actions.close(prompt_bufnr)
-
-                                if
-                                    selected
-                                    and selected.value
-                                    and selected.value.action
-                                then
-                                    selected.value.action()
-                                end
-                            end)
-
-                            return true
-                        end,
-                    })
-                    :find()
+                telescope_picker.action_picker(title, entries)
             end
 
             local function installed_servers(mason_lspconfig)

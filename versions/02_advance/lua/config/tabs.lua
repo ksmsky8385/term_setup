@@ -1,4 +1,5 @@
 local M = {}
+local telescope_picker = require("config.picker")
 
 local function hl(name)
     local ok, value = pcall(vim.api.nvim_get_hl, 0, {
@@ -164,17 +165,11 @@ function M.next()
 end
 
 function M.pick()
-    local ok, telescope = pcall(function()
-        return {
-            actions = require("telescope.actions"),
-            action_state = require("telescope.actions.state"),
-            conf = require("telescope.config").values,
-            finders = require("telescope.finders"),
-            pickers = require("telescope.pickers"),
-        }
-    end)
+    local telescope = telescope_picker.load({
+        notify = false,
+    })
 
-    if not ok then
+    if not telescope then
         vim.cmd("tabs")
         return
     end
@@ -196,13 +191,7 @@ function M.pick()
             prompt_title = "Tabs",
             finder = telescope.finders.new_table({
                 results = entries,
-                entry_maker = function(entry)
-                    return {
-                        value = entry,
-                        display = entry.label,
-                        ordinal = entry.label,
-                    }
-                end,
+                entry_maker = telescope_picker.entry_maker,
             }),
             sorter = telescope.conf.generic_sorter({}),
             attach_mappings = function(prompt_bufnr, map)

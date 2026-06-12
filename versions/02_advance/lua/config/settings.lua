@@ -1,4 +1,5 @@
 local themes = require("config.themes")
+local telescope_picker = require("config.picker")
 
 local M = {}
 
@@ -38,70 +39,8 @@ local function apply_theme(theme, notify)
     return false
 end
 
-local function load_telescope()
-    local ok, telescope = pcall(function()
-        return {
-            actions = require("telescope.actions"),
-            action_state = require("telescope.actions.state"),
-            conf = require("telescope.config").values,
-            finders = require("telescope.finders"),
-            pickers = require("telescope.pickers"),
-        }
-    end)
-
-    if not ok then
-        vim.notify("telescope.nvim is not available", vim.log.levels.ERROR)
-        return nil
-    end
-
-    return telescope
-end
-
 local function picker(title, entries, opts)
-    opts = opts or {}
-
-    local telescope = load_telescope()
-
-    if not telescope then
-        return
-    end
-
-    telescope.pickers
-        .new({}, {
-            prompt_title = title,
-            finder = telescope.finders.new_table({
-                results = entries,
-                entry_maker = function(entry)
-                    return {
-                        value = entry,
-                        display = entry.label,
-                        ordinal = entry.ordinal or entry.label,
-                    }
-                end,
-            }),
-            sorter = telescope.conf.generic_sorter({}),
-            previewer = false,
-            attach_mappings = function(prompt_bufnr, map)
-                local select_entry = function()
-                    local selected = telescope.action_state.get_selected_entry()
-
-                    telescope.actions.close(prompt_bufnr)
-
-                    if selected and selected.value and selected.value.action then
-                        selected.value.action()
-                    end
-                end
-
-                telescope.actions.select_default:replace(select_entry)
-
-                if opts.mappings then
-                    opts.mappings(prompt_bufnr, map, telescope)
-                end
-
-                return true
-            end,
-        })
-        :find()
+    telescope_picker.action_picker(title, entries, opts)
 end
 
 local function open_main()

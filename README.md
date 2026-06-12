@@ -14,8 +14,9 @@ sudo 권한 없이 사용자 홈 디렉토리 아래에 설치되는 구성을 �
 ```text
 1. zsh 설정
 2. nvim 설정
-3. 전체 설정
-4. 나가기
+3. agent 설정
+4. 전체 설정
+5. 나가기
 ```
 
 ## 동작 원리
@@ -33,6 +34,9 @@ sudo 권한 없이 사용자 홈 디렉토리 아래에 설치되는 구성을 �
   - 선택한 버전을 `~/.config/nvim`으로 복사합니다.
   - D2Coding Nerd Font가 없으면 `fonts/`에서 사용자 폰트 경로로 설치합니다.
 
+- `scripts/agent_setting_start.sh`
+  - CLI 에이전트(Antigravity, Codex)의 설치/삭제 및 캐시 삭제 기능 등을 제공합니다.
+
 ## 설치 대상
 
 zsh 설정에서 설치되는 항목:
@@ -46,6 +50,28 @@ zsh 설정에서 설치되는 항목:
 ```
 
 Neovim 설정은 `versions/` 아래의 설정 폴더를 선택해 설치합니다.
+
+Agent 설정에서 설치되는 항목:
+- **Antigravity CLI** : `~/.local/bin/agy` 경로에 설치
+- **Codex CLI** : `~/.local/bin/codex` 경로에 설치
+
+## CLI 에이전트 설정 및 Claude Code 안내
+
+`launch.sh` 메뉴의 **3. agent 설정** 을 통해 다음 AI 에이전트를 설치하거나 관리할 수 있습니다:
+- **Antigravity CLI** : 터미널 환경에서 Google Gemini 모델 기반으로 작동하는 강력한 AI 코딩 어시스턴트입니다.
+- **Codex CLI** : OpenAI 모델 기반의 AI 코딩/쉘 어시스턴트입니다.
+
+### Claude Code 안내
+
+- **Claude Code** : Anthropic에서 개발한 터미널용 에이전트형 AI 코딩 어시스턴트입니다. 코드베이스를 직접 탐색하고 코드를 편집하며 실행까지 터미널 안에서 주도적으로 수행합니다.
+- **설치 안내** : Claude Code는 **Node.js** 환경을 필수로 요구합니다. 후술할 **Node.js가 필요한 경우** 섹션을 참고하여 `nvm` 및 Node.js 설치를 진행한 뒤, 아래 명령어로 설치하여 사용할 수 있습니다:
+
+  ```sh
+  npm install -g @anthropic-ai/claude-code
+  ```
+
+**Claude Code** 의 경우 앞서 설치가능한 **Antigravity** 및 **Codex** 와는 달리 무료 요금제 사용자는 사용이 불가합니다.
+
 
 ## Node.js가 필요한 경우
 
