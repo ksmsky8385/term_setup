@@ -5,7 +5,7 @@ local session_slots = require("config.sessions.slots")
 local M = {}
 
 local read_metadata = metadata_store.read
-local session_path = session_paths.session_path
+local metadata_path = session_paths.metadata_path
 
 local function file_mtime(path)
     local stat = vim.loop.fs_stat(path)
@@ -18,7 +18,7 @@ local function file_mtime(path)
 end
 
 local function session_exists(slot)
-    return vim.fn.filereadable(session_path(slot)) == 1
+    return vim.fn.filereadable(metadata_path(slot)) == 1
 end
 
 local function first_files(files, count)
@@ -47,7 +47,7 @@ end
 
 function M.slot_entry(slot)
     local metadata = read_metadata(slot)
-    local path = session_path(slot)
+    local path = metadata_path(slot)
     local exists = session_exists(slot)
     local configured = session_slots.configured_lookup()[slot] == true
     local modified_at = file_mtime(path)

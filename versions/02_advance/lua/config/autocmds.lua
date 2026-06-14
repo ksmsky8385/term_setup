@@ -1,30 +1,54 @@
-vim.api.nvim_create_autocmd("FileType", {
-    pattern = {
-        "python",
-        "java",
-        "lua",
-    },
-    callback = function()
-        vim.opt_local.tabstop = 4
-        vim.opt_local.shiftwidth = 4
-        vim.opt_local.softtabstop = 4
-        vim.opt_local.expandtab = true
-    end,
-})
+local function set_indent(patterns, size, expandtab)
+    vim.api.nvim_create_autocmd("FileType", {
+        pattern = patterns,
+        callback = function()
+            vim.opt_local.tabstop = size
+            vim.opt_local.shiftwidth = size
+            vim.opt_local.softtabstop = size
+            vim.opt_local.expandtab = expandtab
+        end,
+    })
+end
 
-vim.api.nvim_create_autocmd("FileType", {
-    pattern = {
-        "sh",
-        "html",
-        "css",
-        "javascript",
-        "typescript",
-        "tsx",
-    },
-    callback = function()
-        vim.opt_local.tabstop = 2
-        vim.opt_local.shiftwidth = 2
-        vim.opt_local.softtabstop = 2
-        vim.opt_local.expandtab = false
-    end,
-})
+set_indent({
+    "python",
+    "java",
+    "lua",
+    "rust",
+    "php",
+    "cs",
+    "vim",
+}, 4, true)
+
+set_indent({
+    "json",
+    "jsonc",
+    "yaml",
+    "toml",
+    "markdown",
+    "markdown_inline",
+    "html",
+    "css",
+    "scss",
+    "sass",
+    "less",
+    "javascript",
+    "javascriptreact",
+    "typescript",
+    "typescriptreact",
+    "tsx",
+    "vue",
+    "svelte",
+    "xml",
+    "graphql",
+}, 2, true)
+
+set_indent({
+    "sh",
+    "bash",
+    "zsh",
+    "c",
+    "cpp",
+    "go",
+    "make",
+}, 4, false)

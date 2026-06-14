@@ -112,14 +112,14 @@ vim.opt.rtp:prepend(lazypath)
 
 require("lazy").setup({
     -- -----------------------------------------------------
-    -- 색상 테마
+    -- 색상 테마 ("default" 대신 다른 값으로 변경해야 영구적용)
     -- -----------------------------------------------------
     {
         "folke/vscode.nvim",
         lazy = false,
         priority = 1000,
         config = function()
-            vim.cmd.colorscheme("vscode")
+            vim.cmd.colorscheme("default")
         end,
     },
 

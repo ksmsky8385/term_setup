@@ -4,12 +4,10 @@ local metadata_store = require("config.sessions.metadata")
 local session_note = require("config.sessions.note")
 local session_buffers = require("config.sessions.buffers")
 local session_picker = require("config.sessions.picker")
-local session_paths = require("config.sessions.paths")
 local session_restore = require("config.sessions.restore")
 local session_slots = require("config.sessions.slots")
 local session_store = require("config.sessions.store")
 
-local session_path = session_paths.session_path
 local known_slot_id = session_slots.known
 local prepare_session_load = session_buffers.prepare_load
 local read_metadata = metadata_store.read
@@ -37,7 +35,7 @@ function M.move(from_slot, to_slot, opts)
     return ok, next_slot
 end
 
-local function load_session(slot, path)
+local function load_session(slot)
     local metadata = read_metadata(slot)
     local cwd = metadata.cwd
     local workspace = vim.fn.getcwd()
@@ -56,24 +54,12 @@ local function load_session(slot, path)
 
     vim.g.current_workspace_root = workspace
 
-    local ok, err = pcall(function()
-        vim.cmd("source " .. vim.fn.fnameescape(path))
-    end)
-
-    if not ok then
-        vim.notify("Failed to load session " .. slot .. ": " .. err, vim.log.levels.ERROR)
-        return
-    end
-
     pcall(vim.cmd, "cd " .. vim.fn.fnameescape(workspace))
     vim.g.current_workspace_root = vim.fn.getcwd()
 
     vim.schedule(function()
         session_restore.after_load(metadata)
 
-        if type(metadata.winrestcmd) == "string" and metadata.winrestcmd ~= "" then
-            pcall(vim.cmd, metadata.winrestcmd)
-        end
     end)
 
     vim.notify("Loaded session " .. slot)
@@ -88,15 +74,13 @@ function M.load(slot)
         return
     end
 
-    local path = session_path(slot)
-
     if not session_store.exists(slot) then
         vim.notify("Session " .. slot .. " is empty.", vim.log.levels.WARN)
         return
     end
 
     prepare_session_load(function()
-        load_session(slot, path)
+        load_session(slot)
     end)
 end
 

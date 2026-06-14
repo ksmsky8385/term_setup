@@ -1,5 +1,7 @@
 local M = {}
 
+local session_layout = require("config.sessions.layout")
+
 local function tabpage_windows(tab)
     return vim.tbl_filter(function(win)
         return vim.api.nvim_win_is_valid(win)
@@ -104,7 +106,7 @@ local function restore_floating_slots(floating_slots)
     for _, item in ipairs(floating_slots) do
         if type(item) == "table" then
             pcall(floating.restore_slot, item.slot, item.file, {
-                visible = item.visible == true,
+                visible = false,
             })
         end
     end
@@ -174,6 +176,12 @@ end
 
 function M.after_load(metadata)
     clear_missing_file_buffers()
+
+    if session_layout.restore(metadata.layout) then
+        restore_floating_slots(metadata.floating_slots)
+        return
+    end
+
     restore_terminals(metadata.terminals)
     restore_floating_slots(metadata.floating_slots)
     restore_tree(metadata.tree)

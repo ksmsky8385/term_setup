@@ -88,14 +88,19 @@ local function open_theme()
     }
 
     for _, theme in ipairs(themes.available()) do
-        local marker = theme == active and "* " or "  "
+        local marker = theme.name == active and "* " or "  "
+        local label = theme.name
+
+        if theme.source == "plugin" then
+            label = "+ " .. label
+        end
 
         table.insert(entries, {
-            label = marker .. theme,
-            ordinal = theme,
+            label = marker .. label,
+            ordinal = theme.name,
             action = function()
-                if apply_theme(theme, true) then
-                    themes.save(theme)
+                if apply_theme(theme.name, true) then
+                    themes.save(theme.name)
                     M.open("theme")
                 end
             end,

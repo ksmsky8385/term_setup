@@ -1,19 +1,11 @@
 local metadata_store = require("config.sessions.metadata")
 local session_buffers = require("config.sessions.buffers")
 local session_paths = require("config.sessions.paths")
+local session_layout = require("config.sessions.layout")
 local session_restore = require("config.sessions.restore")
 local session_slots = require("config.sessions.slots")
 
 local M = {}
-
-local session_options = {
-    "buffers",
-    "folds",
-    "help",
-    "tabpages",
-    "terminal",
-    "winsize",
-}
 
 local current_files = session_buffers.current_files
 local current_floating_slots = session_restore.current_floating_slots
@@ -23,7 +15,7 @@ local read_metadata = metadata_store.read
 local write_metadata = metadata_store.write
 
 function M.exists(slot)
-    return vim.fn.filereadable(session_paths.session_path(slot)) == 1
+    return vim.fn.filereadable(session_paths.metadata_path(slot)) == 1
 end
 
 local function move_file(from, to)
@@ -51,17 +43,21 @@ local function update_metadata_slot(slot)
     write_metadata(slot, metadata)
 end
 
-local function with_session_options(callback)
-    local previous = vim.o.sessionoptions
+local function hidden_floating_slots()
+    local slots = current_floating_slots()
 
-    vim.o.sessionoptions = table.concat(session_options, ",")
+    for _, item in ipairs(slots) do
+        item.visible = false
+    end
 
-    local ok, err = pcall(callback)
+    return slots
+end
 
-    vim.o.sessionoptions = previous
+local function hide_floating_slots()
+    local ok, floating = pcall(require, "config.floating")
 
-    if not ok then
-        error(err)
+    if ok and type(floating.hide_all) == "function" then
+        pcall(floating.hide_all)
     end
 end
 
@@ -97,15 +93,12 @@ function M.save(slot, force, opts)
 
     vim.fn.mkdir(session_paths.dir, "p")
 
-    local path = session_paths.session_path(slot)
-    local ok, err = pcall(function()
-        with_session_options(function()
-            vim.cmd("mksession! " .. vim.fn.fnameescape(path))
-        end)
-    end)
+    hide_floating_slots()
+
+    local ok, layout = pcall(session_layout.snapshot)
 
     if not ok then
-        vim.notify("Failed to save session " .. slot .. ": " .. err, vim.log.levels.ERROR)
+        vim.notify("Failed to save session " .. slot .. ": " .. layout, vim.log.levels.ERROR)
         if opts.on_cancel then
             opts.on_cancel()
         end
@@ -118,12 +111,13 @@ function M.save(slot, force, opts)
     metadata.cwd = vim.fn.getcwd()
     metadata.files = current_files()
     metadata.terminals = current_terminal_windows()
-    metadata.floating_slots = current_floating_slots()
+    metadata.floating_slots = hidden_floating_slots()
     metadata.tree = current_tree_state()
-    metadata.winrestcmd = vim.fn.winrestcmd()
+    metadata.layout = layout
     metadata.saved_at = os.date("%Y-%m-%d %H:%M:%S")
 
     write_metadata(slot, metadata)
+    pcall(vim.fn.delete, session_paths.session_path(slot))
 
     if opts.notify ~= false then
         vim.notify("Saved session " .. slot)
