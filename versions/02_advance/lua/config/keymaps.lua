@@ -19,9 +19,20 @@ local function is_empty_unlisted_buffer(buf)
         and not vim.bo[buf].buflisted
         and vim.api.nvim_buf_get_name(buf) == ""
         and vim.bo[buf].buftype == ""
+        and vim.bo[buf].filetype == ""
         and not vim.bo[buf].modified
         and vim.api.nvim_buf_line_count(buf) == 1
         and vim.api.nvim_buf_get_lines(buf, 0, 1, false)[1] == ""
+end
+
+local function cleanup_empty_unlisted_buffers(except_buf)
+    for _, buf in ipairs(vim.api.nvim_list_bufs()) do
+        if buf ~= except_buf and is_empty_unlisted_buffer(buf) then
+            pcall(vim.api.nvim_buf_delete, buf, {
+                force = true,
+            })
+        end
+    end
 end
 
 local function vertical_split_or_empty()
@@ -237,20 +248,34 @@ local function close_blocker(buf, force)
     return nil
 end
 
-local function return_last_window_to_dashboard(force)
-    local old_buf = vim.api.nvim_get_current_buf()
+local function return_buffer_to_dashboard(buf, force)
+    local was_running = false
+
+    if vim.api.nvim_buf_is_valid(buf) and vim.bo[buf].buftype == "terminal" then
+        local job_id = vim.b[buf].terminal_job_id
+
+        was_running = terminal_job_running(buf)
+
+        if was_running then
+            pcall(vim.fn.jobstop, job_id)
+        end
+    end
 
     pcall(vim.cmd, "DashboardHome")
 
+    local dashboard_buf = vim.api.nvim_get_current_buf()
+
     if
-        vim.api.nvim_buf_is_valid(old_buf)
-        and old_buf ~= vim.api.nvim_get_current_buf()
-        and vim.bo[old_buf].filetype ~= "alpha"
+        vim.api.nvim_buf_is_valid(buf)
+        and buf ~= dashboard_buf
+        and vim.bo[buf].filetype ~= "alpha"
     then
-        pcall(vim.api.nvim_buf_delete, old_buf, {
-            force = force,
+        pcall(vim.api.nvim_buf_delete, buf, {
+            force = force or was_running,
         })
     end
+
+    cleanup_empty_unlisted_buffers(dashboard_buf)
 end
 
 local function leader_quit(force)
@@ -270,6 +295,11 @@ local function leader_quit(force)
         local replaced = buffers.delete_current_to_hidden(force)
 
         if replaced ~= nil then
+            return
+        end
+
+        if close_target_window_count() <= 1 then
+            return_buffer_to_dashboard(current_buf, force)
             return
         end
 
@@ -332,7 +362,7 @@ local function leader_quit(force)
         return
     end
 
-    return_last_window_to_dashboard(force)
+    return_buffer_to_dashboard(current_buf, force)
 end
 
 vim.keymap.set("n", "<leader>h", function()
