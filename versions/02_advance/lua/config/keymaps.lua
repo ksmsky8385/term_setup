@@ -597,6 +597,20 @@ vim.keymap.set("n", "<leader>ww", window_picker.focus_window, {
     desc = "Focus window",
 })
 
+vim.keymap.set("n", "<leader>wr", function()
+    window_picker.swap_current_window_label({
+        filetype = {
+            "FloatingTerminal",
+            "NvimTree",
+            "notify",
+        },
+    })
+end, {
+    noremap = true,
+    silent = true,
+    desc = "Swap current window label",
+})
+
 vim.keymap.set("n", "<leader>wv", function()
     vertical_split_or_empty()
 end, {

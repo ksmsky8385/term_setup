@@ -63,7 +63,22 @@ local function window_view(win)
     return nil
 end
 
-local function buffer_descriptor(buf, win)
+local buffer_descriptor
+
+local function dashboard_descriptor(win)
+    local previous = valid_window(win) and vim.w[win].config_dashboard_previous_buf or nil
+    local descriptor = {
+        kind = "dashboard",
+    }
+
+    if valid_buffer(previous) then
+        descriptor.previous = buffer_descriptor(previous)
+    end
+
+    return descriptor
+end
+
+buffer_descriptor = function(buf, win)
     if not valid_buffer(buf) then
         return {
             kind = "empty",
@@ -74,6 +89,10 @@ local function buffer_descriptor(buf, win)
     local buftype = vim.bo[buf].buftype
     local name = vim.api.nvim_buf_get_name(buf)
 
+    if vim.b[buf].config_about_neovim then
+        return dashboard_descriptor(win)
+    end
+
     if filetype == "NvimTree" then
         return {
             kind = "tree",
@@ -82,16 +101,7 @@ local function buffer_descriptor(buf, win)
     end
 
     if filetype == "alpha" then
-        local previous = valid_window(win) and vim.w[win].config_dashboard_previous_buf or nil
-        local descriptor = {
-            kind = "dashboard",
-        }
-
-        if valid_buffer(previous) then
-            descriptor.previous = buffer_descriptor(previous)
-        end
-
-        return descriptor
+        return dashboard_descriptor(win)
     end
 
     if buftype == "terminal" then
@@ -145,6 +155,16 @@ local function window_geometry(win)
     }
 end
 
+local function window_picker_order(win)
+    local ok, picker = pcall(require, "config.window_picker")
+
+    if not ok or type(picker.existing_window_order) ~= "function" then
+        return nil
+    end
+
+    return picker.existing_window_order(win)
+end
+
 local function serialize_layout(node, descriptors, current_win, next_leaf)
     local node_type = node[1]
 
@@ -163,6 +183,7 @@ local function serialize_layout(node, descriptors, current_win, next_leaf)
                     leaf = leaf,
                     current = win == current_win,
                     geometry = window_geometry(win),
+                    window_order = window_picker_order(win),
                 },
                 buffer_descriptor(buf, win)
             )
@@ -191,9 +212,20 @@ function M.snapshot()
     local current_win = vim.api.nvim_get_current_win()
     local tabs = {}
     local tabpages = vim.api.nvim_list_tabpages()
+    local ok_picker, window_picker = pcall(require, "config.window_picker")
 
     for tab_index, tab in ipairs(tabpages) do
         vim.api.nvim_set_current_tabpage(tab)
+
+        if ok_picker and type(window_picker.selectable_windows) == "function" then
+            window_picker.selectable_windows({
+                filetype = {
+                    "FloatingTerminal",
+                    "NvimTree",
+                    "notify",
+                },
+            })
+        end
 
         local descriptors = {}
         local next_leaf = {
@@ -405,6 +437,10 @@ local function restore_dashboard(win, descriptor)
         vim.w[vim.api.nvim_get_current_win()].config_dashboard_previous_buf = previous_buf
     end
 
+    if type(descriptor.previous) == "table" then
+        vim.w[vim.api.nvim_get_current_win()].config_dashboard_previous_descriptor = descriptor.previous
+    end
+
     if valid_window(current_win) then
         pcall(vim.api.nvim_set_current_win, current_win)
     end
@@ -472,6 +508,22 @@ local function restore_terminal_buffers(terminals)
     end
 end
 
+local function restore_window_orders(leaf_windows, windows)
+    local ok, picker = pcall(require, "config.window_picker")
+
+    if not ok or type(picker.set_window_order) ~= "function" then
+        return
+    end
+
+    for leaf, descriptor in pairs(windows or {}) do
+        local order = descriptor.window_order
+
+        if type(order) == "number" and valid_window(leaf_windows[leaf]) then
+            picker.set_window_order(leaf_windows[leaf], order)
+        end
+    end
+end
+
 local function restore_sizes(leaf_windows, windows)
     for leaf, win in pairs(leaf_windows) do
         local descriptor = windows[leaf]
@@ -502,6 +554,7 @@ local function restore_tab(tab)
 
     restore_sizes(leaf_windows, tab.windows or {})
     restore_terminal_buffers(terminals)
+    restore_window_orders(leaf_windows, tab.windows or {})
 
     for leaf, descriptor in pairs(tab.windows or {}) do
         if descriptor.current and valid_window(leaf_windows[leaf]) then

@@ -10,6 +10,7 @@ function M.open()
     vim.bo.bufhidden = "wipe"
     vim.bo.swapfile = false
     vim.bo.modifiable = true
+    vim.b.config_about_neovim = true
     vim.wo.cursorline = true
 
     local version = vim.version()
@@ -125,6 +126,7 @@ function M.open()
         "  창",
         "",
         "    Space ww           창 선택",
+        "    Space wr           현재 창 라벨을 선택 창과 교환",
         "    Space wv           세로 분할",
         "    Space ws           가로 분할",
         "    Space wo           현재 창만 남기기",

@@ -153,6 +153,10 @@ function M.new()
 end
 
 function M.close()
+    if tab_count() <= 1 then
+        return
+    end
+
     vim.cmd("tabclose")
 end
 

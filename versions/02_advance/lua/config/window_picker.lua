@@ -74,6 +74,23 @@ local function existing_window_order(win)
     return nil
 end
 
+function M.window_order(win)
+    return window_order(win)
+end
+
+function M.existing_window_order(win)
+    return existing_window_order(win)
+end
+
+function M.set_window_order(win, order)
+    if vim.api.nvim_win_is_valid(win) and type(order) == "number" then
+        vim.api.nvim_win_set_var(win, "window_picker_order", order)
+        return true
+    end
+
+    return false
+end
+
 local function sort_by_window_order(windows)
     table.sort(windows, function(a, b)
         local a_order = existing_window_order(a)
@@ -369,6 +386,38 @@ function M.pick_window(exclude)
     restore_picker(previous, laststatus, fillchars)
 
     return picked
+end
+
+function M.swap_current_window_label(exclude)
+    local current_win = vim.api.nvim_get_current_win()
+
+    if is_excluded(current_win, exclude) then
+        vim.notify("Current window has no picker label.", vim.log.levels.INFO)
+        return false
+    end
+
+    local target_win = M.pick_window(exclude)
+
+    if not target_win or target_win == -1 then
+        return false
+    end
+
+    if target_win == current_win then
+        return true
+    end
+
+    local current_order = window_order(current_win)
+    local target_order = window_order(target_win)
+
+    if not current_order or not target_order then
+        return false
+    end
+
+    vim.api.nvim_win_set_var(current_win, "window_picker_order", target_order)
+    vim.api.nvim_win_set_var(target_win, "window_picker_order", current_order)
+    vim.cmd("redrawstatus")
+
+    return true
 end
 
 function M.focus_window()

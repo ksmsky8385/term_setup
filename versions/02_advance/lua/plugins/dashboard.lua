@@ -327,7 +327,45 @@ return {
                 return true
             end
 
+            local previous_descriptor = vim.w.config_dashboard_previous_descriptor
+
+            if type(previous_descriptor) == "table" then
+                if previous_descriptor.kind == "file" then
+                    local path = previous_descriptor.path
+
+                    if type(path) == "string" and path ~= "" and vim.fn.filereadable(path) == 1 then
+                        local buf = vim.fn.bufadd(path)
+
+                        vim.fn.bufload(buf)
+                        vim.bo[buf].buflisted = true
+                        vim.w.config_dashboard_previous_buf = buf
+
+                        if is_returnable_buffer(buf) then
+                            vim.api.nvim_win_set_buf(0, buf)
+                            vim.w.config_dashboard_previous_descriptor = nil
+                            return true
+                        end
+                    end
+                elseif previous_descriptor.kind == "terminal" then
+                    local ok, terminal = pcall(require, "config.terminal")
+
+                    if ok and type(terminal.create_buffer_terminal) == "function" then
+                        if
+                            type(previous_descriptor.cwd) == "string"
+                            and vim.fn.isdirectory(previous_descriptor.cwd) == 1
+                        then
+                            pcall(vim.cmd, "lcd " .. vim.fn.fnameescape(previous_descriptor.cwd))
+                        end
+
+                        terminal.create_buffer_terminal()
+                        vim.w.config_dashboard_previous_descriptor = nil
+                        return true
+                    end
+                end
+            end
+
             vim.w.config_dashboard_previous_buf = nil
+            vim.w.config_dashboard_previous_descriptor = nil
 
             return false
         end
