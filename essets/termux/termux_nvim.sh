@@ -11,31 +11,39 @@ pkg update
 pkg install -y git cmake ninja make clang gettext
 
 mkdir -p "$HOME/opt"
-cd "$HOME/opt"
 
 if [ ! -d "$SRC_DIR" ]; then
   git clone https://github.com/neovim/neovim.git "$SRC_DIR"
 fi
 
 cd "$SRC_DIR"
+
 git fetch --tags
 git checkout "$NVIM_VERSION"
 
 rm -rf build .deps
 
-mkdir -p .deps
-cmake -S "$SRC_DIR/cmake.deps" -B "$SRC_DIR/.deps" -G Ninja
+echo "[INFO] First build attempt. This may fail at libuv LLONG_MAX..."
+set +e
+make CMAKE_BUILD_TYPE=Release \
+  CMAKE_EXTRA_FLAGS="-DCMAKE_INSTALL_PREFIX=$INSTALL_DIR"
+FIRST_STATUS=$?
+set -e
 
-cmake --build "$SRC_DIR/.deps" --target libuv-download
+echo "[INFO] First build exit code: $FIRST_STATUS"
+echo "[INFO] Applying libuv limits.h patch..."
 
 if [ ! -f "$LIBUV_C" ]; then
-  echo "[ERROR] libuv source not found:"
+  echo "[ERROR] libuv source file not found:"
   echo "$LIBUV_C"
   exit 1
 fi
 
-grep -q "#include <limits.h>" "$LIBUV_C" || \
+if ! grep -q "#include <limits.h>" "$LIBUV_C"; then
   sed -i '1i #include <limits.h>' "$LIBUV_C"
+fi
+
+echo "[INFO] Rebuilding after patch..."
 
 make CMAKE_BUILD_TYPE=Release \
   CMAKE_EXTRA_FLAGS="-DCMAKE_INSTALL_PREFIX=$INSTALL_DIR"
@@ -45,3 +53,11 @@ make install
 echo
 echo "[OK] Neovim installed:"
 "$INSTALL_DIR/bin/nvim" --version | head -1
+
+echo
+echo "Run with:"
+echo "$INSTALL_DIR/bin/nvim"
+
+echo
+echo "To make it default:"
+echo "export PATH=\"$INSTALL_DIR/bin:\$PATH\""
