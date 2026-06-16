@@ -1,0 +1,1 @@
+export PATH="$HOME/opt/nvim-0.11.7/bin:$PATH"

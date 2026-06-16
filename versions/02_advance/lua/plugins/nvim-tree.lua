@@ -463,6 +463,9 @@ return {
 
             renderer = {
                 group_empty = true,
+				icons = {
+					padding = "  ",
+				},
             },
 
             filters = {
