@@ -5,10 +5,6 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 VERSIONS_DIR="$ROOT_DIR/versions"
-LOCAL_FONT_DIR="$HOME/.local/share/fonts"
-LOCAL_D2CODING_DIR="$LOCAL_FONT_DIR/D2Coding"
-SOURCE_FONT_DIR="$ROOT_DIR/fonts"
-SOURCE_D2CODING_DIR="$SOURCE_FONT_DIR/D2Coding"
 
 echo "NeoVim 환경설정 시작"
 echo
@@ -21,53 +17,6 @@ if [ ! -d "$VERSIONS_DIR" ]; then
     echo "Error: versions 디렉토리가 없습니다."
     echo "Expected: $VERSIONS_DIR"
     exit 1
-fi
-
-# ---------------------------------------------------------
-# D2Coding 폰트 설치
-# ~/.local/share/fonts/D2Coding 이 없을 때만 물어봄
-# ---------------------------------------------------------
-
-echo "폰트 설정을 확인합니다."
-
-mkdir -p "$LOCAL_FONT_DIR"
-
-if [ -d "$LOCAL_D2CODING_DIR" ]; then
-    echo "D2Coding 폰트가 이미 설치되어 있습니다."
-else
-    echo "D2Coding 폰트가 설치되어 있지 않습니다."
-    echo "설치할까요? [Y/n]"
-    printf "선택: "
-    read -r install_font_choice
-
-    case "$install_font_choice" in
-        "" | "y" | "Y" | "yes" | "YES")
-            if [ -d "$SOURCE_D2CODING_DIR" ]; then
-                echo "D2Coding 폰트를 설치합니다."
-                cp -R "$SOURCE_D2CODING_DIR" "$LOCAL_D2CODING_DIR"
-            elif [ -d "$SOURCE_FONT_DIR" ]; then
-                echo "fonts 디렉토리를 사용자 폰트 폴더로 복사합니다."
-                cp -R "$SOURCE_FONT_DIR"/* "$LOCAL_FONT_DIR"/
-            else
-                echo "Warning: 스크립트 경로에 fonts 디렉토리가 없습니다."
-                echo "Skip: D2Coding 폰트 설치를 건너뜁니다."
-            fi
-
-            if command -v fc-cache >/dev/null 2>&1; then
-                echo "폰트 캐시를 갱신합니다."
-                fc-cache -f "$LOCAL_FONT_DIR" >/dev/null 2>&1 || true
-            else
-                echo "Warning: fc-cache 명령어가 없어 폰트 캐시 갱신을 건너뜁니다."
-            fi
-            ;;
-        "n" | "N" | "no" | "NO")
-            echo "D2Coding 폰트 설치를 건너뜁니다."
-            ;;
-        *)
-            echo "Error: Y 또는 n을 입력하세요."
-            exit 1
-            ;;
-    esac
 fi
 
 # ---------------------------------------------------------

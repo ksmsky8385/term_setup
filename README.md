@@ -19,9 +19,25 @@ sudo 권한 없이 사용자 홈 디렉토리 아래에 설치되는 구성을 �
 5. 나가기
 ```
 
+## 터미널 폰트 권장 설정
+
+터미널 기본 폰트는 `D2Coding-Ver1.3.2-20180524-all.ttc`의 `D2Coding` 사용을 권장합니다. `launch.sh`에서 zsh 또는 nvim 설정을 선택하면 이 폰트 파일을 `~/.local/share/fonts/`로 복사하고 폰트 캐시를 갱신합니다.
+
+시스템 기본 고정폭 폰트를 `D2Coding 12`로 바꾸려면 아래 명령을 실행합니다.
+
+```sh
+fc-cache -f ~/.local/share/fonts
+gsettings set org.gnome.desktop.interface monospace-font-name "D2Coding 12"
+```
+
+zsh 및 nvim의 일부 문자사용을 위해 D2coding Nerd Font 계열도 함께 복사됩니다.
+
 ## 동작 원리
 
 `launch.sh`는 `scripts/` 안의 설정 스크립트를 실행합니다.
+
+- `launch.sh`
+  - zsh 설정, nvim 설정, 전체 설정 선택 시 D2Coding 폰트를 사용자 폰트 경로에 설치합니다.
 
 - `scripts/zsh_setting_start.sh`
   - Oh My Zsh가 없으면 먼저 `~/.oh-my-zsh`에 설치합니다.
@@ -32,7 +48,6 @@ sudo 권한 없이 사용자 홈 디렉토리 아래에 설치되는 구성을 �
 - `scripts/nvim_setting_start.sh`
   - `versions/` 안의 Neovim 설정 버전을 선택하게 합니다.
   - 선택한 버전을 `~/.config/nvim`으로 복사합니다.
-  - D2Coding Nerd Font가 없으면 `fonts/`에서 사용자 폰트 경로로 설치합니다.
 
 - `scripts/agent_setting_start.sh`
   - CLI 에이전트(Antigravity, Codex)의 설치/삭제 및 캐시 삭제 기능 등을 제공합니다.

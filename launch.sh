@@ -7,6 +7,12 @@ ZSH_SCRIPT="$SCRIPT_DIR/scripts/zsh_setting_start.sh"
 NVIM_SCRIPT="$SCRIPT_DIR/scripts/nvim_setting_start.sh"
 AGENT_SCRIPT="$SCRIPT_DIR/scripts/agent_setting_start.sh"
 USER_PATH_LINE='export PATH="$HOME/.local/bin:$PATH"'
+LOCAL_FONT_DIR="$HOME/.local/share/fonts"
+LOCAL_D2CODING_DIR="$LOCAL_FONT_DIR/D2Coding"
+LOCAL_D2CODING_TTC="$LOCAL_FONT_DIR/D2Coding-Ver1.3.2-20180524-all.ttc"
+SOURCE_FONT_DIR="$SCRIPT_DIR/fonts"
+SOURCE_D2CODING_DIR="$SOURCE_FONT_DIR/D2Coding"
+SOURCE_D2CODING_TTC="$SOURCE_FONT_DIR/D2Coding-Ver1.3.2-20180524-all.ttc"
 
 ensure_user_path() {
     local shell_files=("$HOME/.zshrc" "$HOME/.bashrc")
@@ -49,6 +55,56 @@ ask_yes_no() {
                 ;;
         esac
     done
+}
+
+ensure_fonts() {
+    local font_installed=false
+
+    echo
+    echo "폰트 설정을 확인합니다."
+
+    mkdir -p "$LOCAL_FONT_DIR"
+
+    if [ -d "$LOCAL_D2CODING_DIR" ]; then
+        echo "D2Coding Nerd Font가 이미 설치되어 있습니다."
+    elif [ -d "$SOURCE_D2CODING_DIR" ]; then
+        echo "D2Coding Nerd Font를 설치합니다."
+        cp -R "$SOURCE_D2CODING_DIR" "$LOCAL_D2CODING_DIR"
+        font_installed=true
+    else
+        echo "Warning: D2Coding Nerd Font 디렉토리가 없습니다."
+        echo "Expected: $SOURCE_D2CODING_DIR"
+    fi
+
+    if [ -f "$LOCAL_D2CODING_TTC" ]; then
+        echo "D2Coding TTC 폰트가 이미 설치되어 있습니다."
+    elif [ -f "$SOURCE_D2CODING_TTC" ]; then
+        echo "D2Coding TTC 폰트를 설치합니다."
+        cp "$SOURCE_D2CODING_TTC" "$LOCAL_D2CODING_TTC"
+        font_installed=true
+    else
+        echo "Warning: D2Coding TTC 폰트 파일이 없습니다."
+        echo "Expected: $SOURCE_D2CODING_TTC"
+    fi
+
+    if [ "$font_installed" = true ]; then
+        if command -v fc-cache >/dev/null 2>&1; then
+            echo "폰트 캐시를 갱신합니다."
+            fc-cache -f "$LOCAL_FONT_DIR" >/dev/null 2>&1 || true
+        else
+            echo "Warning: fc-cache 명령어가 없어 폰트 캐시 갱신을 건너뜁니다."
+        fi
+    fi
+}
+
+ensure_fonts_for_choice() {
+    local choice="$1"
+
+    case "$choice" in
+        1 | 2 | 4)
+            ensure_fonts
+            ;;
+    esac
 }
 
 run_script() {
@@ -118,6 +174,7 @@ while true; do
         1 | 2 | 3 | 4)
             if ask_yes_no "설정을 진행하겠습니까?"; then
                 ensure_user_path
+                ensure_fonts_for_choice "$choice"
 
                 if run_selected_setup "$choice"; then
                     echo
