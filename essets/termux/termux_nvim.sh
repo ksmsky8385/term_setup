@@ -7,9 +7,11 @@ SRC_DIR="$HOME/opt/neovim"
 INSTALL_DIR="$HOME/opt/nvim-0.11.7"
 LIBUV_C="$SRC_DIR/.deps/build/src/libuv/src/unix/linux.c"
 
+echo "[1/6] Install required packages"
 pkg update
 pkg install -y git cmake ninja make clang gettext
 
+echo "[2/6] Prepare source directory"
 mkdir -p "$HOME/opt"
 
 if [ ! -d "$SRC_DIR" ]; then
@@ -21,38 +23,52 @@ cd "$SRC_DIR"
 git fetch --tags
 git checkout "$NVIM_VERSION"
 
+echo "[3/6] Clean previous build"
 rm -rf build .deps
 
-echo "[1/4] First build. It is expected to fail at LLONG_MAX."
-
+echo "[4/6] First build attempt. It may fail at libuv LLONG_MAX."
 set +e
 make CMAKE_BUILD_TYPE=Release \
   CMAKE_EXTRA_FLAGS="-DCMAKE_INSTALL_PREFIX=$INSTALL_DIR"
 set -e
 
-echo "[2/4] Patching libuv linux.c"
+echo "[5/6] Patch libuv LLONG_MAX issue"
 
 if [ ! -f "$LIBUV_C" ]; then
-  echo "[ERROR] libuv source not found:"
+  echo "[ERROR] libuv source file not found:"
   echo "$LIBUV_C"
+  echo
+  echo "The first build did not reach libuv source extraction."
   exit 1
 fi
 
-grep -q "#include <limits.h>" "$LIBUV_C" || \
-  sed -i '1i #include <limits.h>' "$LIBUV_C"
+# Remove older include-only patch if it exists.
+sed -i '/#include <limits.h>/d' "$LIBUV_C"
 
-echo "[3/4] Rebuild after patch"
+# Add direct LLONG_MAX definition. This is stronger than relying on limits.h.
+if ! grep -q "TERMUX_LL0NG_MAX_PATCH" "$LIBUV_C"; then
+  sed -i '1i #ifndef LLONG_MAX\n#define LLONG_MAX 9223372036854775807LL\n#endif\n/* TERMUX_LL0NG_MAX_PATCH */' "$LIBUV_C"
+fi
 
+# Clear broken libuv build state, but keep downloaded/patched source.
+rm -rf "$SRC_DIR/.deps/build/src/libuv-build"
+rm -f "$SRC_DIR/.deps/build/src/libuv-stamp/libuv-build"
+rm -f "$SRC_DIR/.deps/build/src/libuv-stamp/libuv-configure"
+
+echo "[6/6] Rebuild and install"
 make CMAKE_BUILD_TYPE=Release \
   CMAKE_EXTRA_FLAGS="-DCMAKE_INSTALL_PREFIX=$INSTALL_DIR"
-
-echo "[4/4] Install"
 
 make install
 
 echo
-echo "[OK] Installed:"
+echo "[OK] Neovim installed:"
 "$INSTALL_DIR/bin/nvim" --version | head -1
+
 echo
 echo "Run:"
 echo "$INSTALL_DIR/bin/nvim"
+
+echo
+echo "Make default:"
+echo "export PATH=\"$INSTALL_DIR/bin:\$PATH\""
