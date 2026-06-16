@@ -376,6 +376,47 @@ function M.open_float_terminal()
     create_float_terminal()
 end
 
+function M.clear_current_terminal()
+    local current_buf = vim.api.nvim_get_current_buf()
+
+    if vim.bo[current_buf].buftype ~= "terminal" then
+        return
+    end
+
+    if M.is_float_terminal(current_buf) then
+        return
+    end
+
+    local current_win = vim.api.nvim_get_current_win()
+    local old_job_id = vim.b[current_buf].terminal_job_id
+    local new_buf = vim.api.nvim_create_buf(true, false)
+
+    vim.b[current_buf].terminal_closing = true
+
+    vim.api.nvim_win_set_buf(current_win, new_buf)
+
+    vim.bo[new_buf].buflisted = true
+    vim.b[new_buf].terminal_kind = BUFFER_TERMINAL_KIND
+
+    local new_job_id = vim.fn.termopen(vim.o.shell)
+    vim.b[new_buf].terminal_job_id = new_job_id
+
+    if job_running(old_job_id) then
+        pcall(vim.fn.jobstop, old_job_id)
+    end
+
+    stop_terminal_insert()
+    refresh_tree()
+
+    vim.schedule(function()
+        if valid_buffer(current_buf) then
+            pcall(vim.api.nvim_buf_delete, current_buf, { force = true })
+        end
+
+        refresh_tree()
+    end)
+end
+
 function M.kill_current_terminal(force)
     local opts = {}
 

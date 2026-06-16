@@ -399,6 +399,25 @@ end, {
     desc = "Create buffer terminal in vertical split",
 })
 
+vim.api.nvim_create_autocmd("TermOpen", {
+    callback = function(args)
+        vim.schedule(function()
+            if
+                vim.api.nvim_buf_is_valid(args.buf)
+                and vim.bo[args.buf].buftype == "terminal"
+                and vim.bo[args.buf].filetype ~= "FloatingTerminal"
+            then
+                vim.keymap.set("n", "<leader>tc", terminal.clear_current_terminal, {
+                    buffer = args.buf,
+                    noremap = true,
+                    silent = true,
+                    desc = "Reset terminal buffer",
+                })
+            end
+        end)
+    end,
+})
+
 vim.keymap.set("n", "<leader>`", terminal.open_float_terminal, {
     noremap = true,
     silent = true,

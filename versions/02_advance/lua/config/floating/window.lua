@@ -49,6 +49,23 @@ local function title_for_buffer(slot_id, buf)
     return " [F" .. slot_id .. "] " .. name .. " "
 end
 
+local function configure_window(win)
+    local buf = vim.api.nvim_win_get_buf(win)
+    local plain_window = false
+
+    if state.valid_buffer(buf) then
+        local filetype = vim.bo[buf].filetype
+
+        plain_window = vim.bo[buf].buftype == "terminal"
+            or filetype == state.SLOT_FILETYPE
+            or filetype == "alpha"
+    end
+
+    vim.wo[win].number = not plain_window
+    vim.wo[win].relativenumber = false
+    vim.wo[win].signcolumn = plain_window and "no" or "yes"
+end
+
 function M.update_title(slot_id)
     local item = state.slots[slot_id]
 
@@ -56,16 +73,12 @@ function M.update_title(slot_id)
         return
     end
 
+    configure_window(item.win)
+
     pcall(vim.api.nvim_win_set_config, item.win, {
         title = title_for_buffer(slot_id, vim.api.nvim_win_get_buf(item.win)),
         title_pos = "center",
     })
-end
-
-local function configure_window(win)
-    vim.wo[win].number = true
-    vim.wo[win].relativenumber = false
-    vim.wo[win].signcolumn = "yes"
 end
 
 function M.save_view(item)
