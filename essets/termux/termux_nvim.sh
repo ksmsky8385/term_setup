@@ -23,41 +23,36 @@ git checkout "$NVIM_VERSION"
 
 rm -rf build .deps
 
-echo "[INFO] First build attempt. This may fail at libuv LLONG_MAX..."
+echo "[1/4] First build. It is expected to fail at LLONG_MAX."
+
 set +e
 make CMAKE_BUILD_TYPE=Release \
   CMAKE_EXTRA_FLAGS="-DCMAKE_INSTALL_PREFIX=$INSTALL_DIR"
-FIRST_STATUS=$?
 set -e
 
-echo "[INFO] First build exit code: $FIRST_STATUS"
-echo "[INFO] Applying libuv limits.h patch..."
+echo "[2/4] Patching libuv linux.c"
 
 if [ ! -f "$LIBUV_C" ]; then
-  echo "[ERROR] libuv source file not found:"
+  echo "[ERROR] libuv source not found:"
   echo "$LIBUV_C"
   exit 1
 fi
 
-if ! grep -q "#include <limits.h>" "$LIBUV_C"; then
+grep -q "#include <limits.h>" "$LIBUV_C" || \
   sed -i '1i #include <limits.h>' "$LIBUV_C"
-fi
 
-echo "[INFO] Rebuilding after patch..."
+echo "[3/4] Rebuild after patch"
 
 make CMAKE_BUILD_TYPE=Release \
   CMAKE_EXTRA_FLAGS="-DCMAKE_INSTALL_PREFIX=$INSTALL_DIR"
 
+echo "[4/4] Install"
+
 make install
 
 echo
-echo "[OK] Neovim installed:"
+echo "[OK] Installed:"
 "$INSTALL_DIR/bin/nvim" --version | head -1
-
 echo
-echo "Run with:"
+echo "Run:"
 echo "$INSTALL_DIR/bin/nvim"
-
-echo
-echo "To make it default:"
-echo "export PATH=\"$INSTALL_DIR/bin:\$PATH\""
