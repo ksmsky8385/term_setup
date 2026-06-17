@@ -74,6 +74,27 @@ function M.assigned_slots_by_buffer()
     return state.assigned_slots_by_buffer()
 end
 
+function M.clear_hidden_assignments_for_buffer(buf, keep_slot_id)
+    keep_slot_id = state.normalize_slot_id(keep_slot_id)
+
+    if not state.valid_buffer(buf) then
+        return
+    end
+
+    for slot_id, item in pairs(state.slots) do
+        if
+            slot_id ~= keep_slot_id
+            and item.buf == buf
+            and not state.valid_window(item.win)
+        then
+            item.buf = nil
+            item.view = nil
+            item.cursor = nil
+            state.clear_buffer_slot(buf, slot_id)
+        end
+    end
+end
+
 function M.slot_sort_rank(buf)
     return state.slot_sort_rank(buf)
 end
@@ -88,6 +109,7 @@ end
 
 function M.restore_slot(slot_id, file, opts)
     opts = opts or {}
+    slot_id = state.normalize_slot_id(slot_id)
 
     if type(file) ~= "string" or file == "" or vim.fn.filereadable(file) == 0 then
         return false
@@ -113,6 +135,7 @@ function M.restore_slot(slot_id, file, opts)
 end
 
 function M.open_slot(slot_id)
+    slot_id = state.normalize_slot_id(slot_id)
     local item = state.slot(slot_id)
 
     window.hide_other_slots(slot_id)
@@ -180,6 +203,7 @@ function M.show_buffer_slot(buf)
 end
 
 function M.toggle(slot_id)
+    slot_id = state.normalize_slot_id(slot_id)
     local item = state.slot(slot_id)
 
     if state.valid_window(item.win) then
@@ -197,7 +221,7 @@ function M.open_buffer(buf, opts)
         return false
     end
 
-    local slot_id = opts.slot_id or M.window_slot_id()
+    local slot_id = state.normalize_slot_id(opts.slot_id or M.window_slot_id())
 
     if slot_id == nil then
         return false
@@ -275,7 +299,7 @@ end
 
 function M.close_current(force)
     local win = vim.api.nvim_get_current_win()
-    local slot_id = M.window_slot_id(win)
+    local slot_id = state.normalize_slot_id(M.window_slot_id(win))
 
     if slot_id == nil then
         return false

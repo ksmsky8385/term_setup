@@ -22,6 +22,14 @@ for index, slot_id in ipairs(M.SLOT_ORDER) do
     slot_rank[slot_id] = index
 end
 
+function M.normalize_slot_id(slot_id)
+    if slot_id == nil then
+        return nil
+    end
+
+    return tostring(slot_id)
+end
+
 function M.valid_buffer(buf)
     return buf and vim.api.nvim_buf_is_valid(buf)
 end
@@ -47,6 +55,8 @@ function M.visible_windows_for_buffer(buf)
 end
 
 function M.slot(slot_id)
+    slot_id = M.normalize_slot_id(slot_id)
+
     M.slots[slot_id] = M.slots[slot_id] or {
         buf = nil,
         win = nil,
@@ -62,14 +72,20 @@ function M.slot_ids()
 end
 
 function M.mark_window(win, slot_id)
+    slot_id = M.normalize_slot_id(slot_id)
+
     vim.w[win].floating_slot_id = slot_id
 end
 
 function M.mark_buffer(buf, slot_id)
+    slot_id = M.normalize_slot_id(slot_id)
+
     vim.b[buf].floating_slot_id = slot_id
 end
 
 function M.clear_buffer_slot(buf, slot_id)
+    slot_id = M.normalize_slot_id(slot_id)
+
     if M.valid_buffer(buf) and vim.b[buf].floating_slot_id == slot_id then
         vim.b[buf].floating_slot_id = nil
     end

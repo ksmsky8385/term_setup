@@ -17,6 +17,22 @@ local function set_window_buffer(win, buf)
     return true
 end
 
+local function clear_hidden_floating_sources(buf, target_win)
+    local ok_floating, floating = pcall(require, "config.floating")
+
+    if not ok_floating or type(floating.clear_hidden_assignments_for_buffer) ~= "function" then
+        return
+    end
+
+    local keep_slot_id = nil
+
+    if floating.is_slot_window(target_win) then
+        keep_slot_id = floating.window_slot_id(target_win)
+    end
+
+    floating.clear_hidden_assignments_for_buffer(buf, keep_slot_id)
+end
+
 local function can_delete_unique_window_buffer(buf, force)
     if not vim.api.nvim_buf_is_valid(buf) then
         return false
@@ -58,6 +74,7 @@ local function move_between_windows(buf, source_win, target_win)
     end
 
     set_window_buffer(target_win, buf)
+    clear_hidden_floating_sources(buf, target_win)
 
     return true
 end
