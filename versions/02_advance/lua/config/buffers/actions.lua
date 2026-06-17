@@ -3,6 +3,12 @@ local windows = require("config.buffers.windows")
 
 local M = {}
 
+local function floating_assigned(buf)
+    local ok, floating = pcall(require, "config.floating")
+
+    return ok and type(floating.has_assignment) == "function" and floating.has_assignment(buf)
+end
+
 function M.hidden_replacement(current)
     local candidates = {}
 
@@ -11,6 +17,7 @@ function M.hidden_replacement(current)
             buf ~= current
             and state.movable(buf)
             and windows.all_visible_count(buf) == 0
+            and not floating_assigned(buf)
         then
             table.insert(candidates, buf)
         end

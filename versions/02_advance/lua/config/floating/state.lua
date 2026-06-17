@@ -162,6 +162,20 @@ function M.assigned_slots_by_buffer()
     return assigned
 end
 
+function M.has_assignment(buf)
+    if not M.valid_buffer(buf) then
+        return false
+    end
+
+    for _, item in pairs(M.slots) do
+        if item.buf == buf then
+            return true
+        end
+    end
+
+    return false
+end
+
 function M.label(slot_id)
     slot_id = tostring(slot_id)
 

@@ -74,6 +74,10 @@ function M.assigned_slots_by_buffer()
     return state.assigned_slots_by_buffer()
 end
 
+function M.has_assignment(buf)
+    return state.has_assignment(buf)
+end
+
 function M.clear_hidden_assignments_for_buffer(buf, keep_slot_id)
     keep_slot_id = state.normalize_slot_id(keep_slot_id)
 
