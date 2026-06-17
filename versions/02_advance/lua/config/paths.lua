@@ -28,6 +28,21 @@ local function ensure_dir(path, label)
     return false
 end
 
+local function temp_dir()
+    local path = vim.env.NVIM_TOOL_TMPDIR or vim.env.TMPDIR or "/tmp"
+    path = vim.fn.fnamemodify(vim.fn.expand(path), ":p"):gsub("/+$", "")
+
+    if path == "" then
+        path = "/"
+    end
+
+    if ensure_dir(path, "tool temp") then
+        return path
+    end
+
+    return nil
+end
+
 local function path_contains(path)
     for entry in string.gmatch(vim.env.PATH or "", "[^:]+") do
         if entry == path then
@@ -66,8 +81,14 @@ local function ensure_rg()
 
     local version = "14.1.1"
     local filename = "ripgrep-" .. version .. "-x86_64-unknown-linux-musl"
-    local tar_path = "/tmp/" .. filename .. ".tar.gz"
-    local extract_dir = "/tmp/" .. filename
+    local tmp = temp_dir()
+
+    if not tmp then
+        return
+    end
+
+    local tar_path = tmp .. "/" .. filename .. ".tar.gz"
+    local extract_dir = tmp .. "/" .. filename
 
     local url = "https://github.com/BurntSushi/ripgrep/releases/download/"
         .. version
@@ -95,7 +116,7 @@ local function ensure_rg()
         "-xzf",
         tar_path,
         "-C",
-        "/tmp",
+        tmp,
     })
 
     if vim.v.shell_error ~= 0 then
@@ -202,8 +223,14 @@ local function ensure_lazygit()
     end
 
     local filename = vim.fn.fnamemodify(url, ":t")
-    local tar_path = "/tmp/" .. filename
-    local extract_dir = "/tmp/lazygit-install"
+    local tmp = temp_dir()
+
+    if not tmp then
+        return
+    end
+
+    local tar_path = tmp .. "/" .. filename
+    local extract_dir = tmp .. "/lazygit-install"
 
     local curl_result = vim.fn.system({
         "curl",
