@@ -5,7 +5,6 @@ M.window_picker_exclude = {
         "NvimTree",
         "notify",
         "FloatingTerminal",
-        "FloatingSlot",
     },
 }
 

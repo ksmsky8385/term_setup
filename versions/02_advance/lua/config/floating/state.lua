@@ -2,6 +2,25 @@ local M = {}
 
 M.SLOT_FILETYPE = "FloatingSlot"
 M.slots = {}
+M.SLOT_ORDER = {
+    "`",
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "6",
+    "7",
+    "8",
+    "9",
+    "0",
+}
+
+local slot_rank = {}
+
+for index, slot_id in ipairs(M.SLOT_ORDER) do
+    slot_rank[slot_id] = index
+end
 
 function M.valid_buffer(buf)
     return buf and vim.api.nvim_buf_is_valid(buf)
@@ -36,6 +55,10 @@ function M.slot(slot_id)
     }
 
     return M.slots[slot_id]
+end
+
+function M.slot_ids()
+    return vim.deepcopy(M.SLOT_ORDER)
 end
 
 function M.mark_window(win, slot_id)
@@ -87,17 +110,54 @@ function M.slot_label_for_buffer(buf)
 
     for slot_id, item in pairs(M.slots) do
         if item.buf == buf then
-            return "F" .. slot_id
+            return M.label(slot_id)
         end
     end
 
     local slot_id = vim.b[buf].floating_slot_id
 
     if slot_id ~= nil then
-        return "F" .. slot_id
+        return M.label(slot_id)
     end
 
     return nil
+end
+
+function M.assigned_slots_by_buffer()
+    local assigned = {}
+
+    for slot_id, item in pairs(M.slots) do
+        if M.valid_buffer(item.buf) and vim.bo[item.buf].filetype ~= M.SLOT_FILETYPE then
+            assigned[item.buf] = assigned[item.buf] or {}
+            table.insert(assigned[item.buf], {
+                slot = slot_id,
+                label = M.label(slot_id),
+                rank = M.slot_rank(slot_id),
+            })
+        end
+    end
+
+    for _, slots in pairs(assigned) do
+        table.sort(slots, function(a, b)
+            return a.rank < b.rank
+        end)
+    end
+
+    return assigned
+end
+
+function M.label(slot_id)
+    slot_id = tostring(slot_id)
+
+    if slot_id == "`" then
+        return "F~"
+    end
+
+    return "F" .. slot_id
+end
+
+function M.slot_rank(slot_id)
+    return slot_rank[tostring(slot_id)] or 1000
 end
 
 function M.slot_sort_rank(buf)
@@ -120,43 +180,28 @@ function M.slot_sort_rank(buf)
         return nil
     end
 
-    if slot_id == 0 then
-        return 10
-    end
-
-    return slot_id
+    return M.slot_rank(slot_id)
 end
 
 function M.current_slots()
     local entries = {}
 
     for slot_id, item in pairs(M.slots) do
-        if M.valid_buffer(item.buf) then
+        if M.valid_buffer(item.buf) and vim.bo[item.buf].filetype ~= M.SLOT_FILETYPE then
             local name = vim.api.nvim_buf_get_name(item.buf)
 
             if name ~= "" and vim.bo[item.buf].buftype == "" then
                 table.insert(entries, {
                     slot = slot_id,
                     file = name,
-                    visible = M.valid_window(item.win),
+                    visible = M.valid_window(item.win) == true,
                 })
             end
         end
     end
 
     table.sort(entries, function(a, b)
-        local a_slot = tonumber(a.slot) or 0
-        local b_slot = tonumber(b.slot) or 0
-
-        if a_slot == 0 then
-            a_slot = 10
-        end
-
-        if b_slot == 0 then
-            b_slot = 10
-        end
-
-        return a_slot < b_slot
+        return M.slot_rank(a.slot) < M.slot_rank(b.slot)
     end)
 
     return entries

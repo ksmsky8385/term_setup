@@ -1,5 +1,6 @@
 local state = require("config.buffers.state")
 local visibility = require("config.buffers.window_visibility")
+local empty_buffers = require("config.empty_buffers")
 
 local M = {}
 
@@ -57,6 +58,10 @@ function M.fallback_for_cleared_window(win, original_buf)
         vim.api.nvim_win_set_buf(win, fallback)
     end
 
+    empty_buffers.cleanup({
+        keep = { fallback },
+    })
+
     return fallback
 end
 
@@ -78,6 +83,16 @@ function M.clear_showing_buffer(buf)
     if vim.api.nvim_win_is_valid(current_win) then
         pcall(vim.api.nvim_set_current_win, current_win)
     end
+
+    local keep = {}
+
+    for _, entry in ipairs(cleared) do
+        table.insert(keep, entry.fallback)
+    end
+
+    empty_buffers.cleanup({
+        keep = keep,
+    })
 
     return cleared
 end
@@ -134,6 +149,16 @@ function M.clear_listed_except(keep_windows)
             end
         end
     end
+
+    local keep = {}
+
+    for _, entry in ipairs(cleared) do
+        table.insert(keep, entry.fallback)
+    end
+
+    empty_buffers.cleanup({
+        keep = keep,
+    })
 
     return cleared
 end

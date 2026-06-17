@@ -4,6 +4,7 @@ vim.keymap.set("t", "<Esc>", "<C-\\><C-n>", {
 })
 
 local floating = require("config.floating")
+local empty_buffers = require("config.empty_buffers")
 
 local function is_nvim_tree()
     return vim.bo.filetype == "NvimTree"
@@ -14,27 +15,6 @@ local function empty_unlisted_buffer()
     vim.bo.buflisted = false
 end
 
-local function is_empty_unlisted_buffer(buf)
-    return vim.api.nvim_buf_is_valid(buf)
-        and not vim.bo[buf].buflisted
-        and vim.api.nvim_buf_get_name(buf) == ""
-        and vim.bo[buf].buftype == ""
-        and vim.bo[buf].filetype == ""
-        and not vim.bo[buf].modified
-        and vim.api.nvim_buf_line_count(buf) == 1
-        and vim.api.nvim_buf_get_lines(buf, 0, 1, false)[1] == ""
-end
-
-local function cleanup_empty_unlisted_buffers(except_buf)
-    for _, buf in ipairs(vim.api.nvim_list_bufs()) do
-        if buf ~= except_buf and is_empty_unlisted_buffer(buf) then
-            pcall(vim.api.nvim_buf_delete, buf, {
-                force = true,
-            })
-        end
-    end
-end
-
 local function vertical_split_or_empty()
     if floating.reject_window_action() then
         return
@@ -43,6 +23,9 @@ local function vertical_split_or_empty()
     require("config.window_picker").remember_window()
     vim.cmd("rightbelow vsplit")
     empty_unlisted_buffer()
+    empty_buffers.cleanup({
+        keep = { vim.api.nvim_get_current_buf() },
+    })
 end
 
 local function horizontal_split_or_empty()
@@ -53,6 +36,16 @@ local function horizontal_split_or_empty()
     require("config.window_picker").remember_window()
     vim.cmd("rightbelow split")
     empty_unlisted_buffer()
+    empty_buffers.cleanup({
+        keep = { vim.api.nvim_get_current_buf() },
+    })
+end
+
+local function open_dashboard_home()
+    pcall(vim.cmd, "DashboardHome")
+    empty_buffers.cleanup({
+        keep = { vim.api.nvim_get_current_buf() },
+    })
 end
 
 local function only_non_tree_window()
@@ -222,7 +215,7 @@ local function close_current_window_or_dashboard(current_win)
     if close_target_window_count() > 1 then
         pcall(vim.api.nvim_win_close, current_win, true)
     else
-        pcall(vim.cmd, "DashboardHome")
+        open_dashboard_home()
     end
 end
 
@@ -261,7 +254,7 @@ local function return_buffer_to_dashboard(buf, force)
         end
     end
 
-    pcall(vim.cmd, "DashboardHome")
+    open_dashboard_home()
 
     local dashboard_buf = vim.api.nvim_get_current_buf()
 
@@ -275,7 +268,9 @@ local function return_buffer_to_dashboard(buf, force)
         })
     end
 
-    cleanup_empty_unlisted_buffers(dashboard_buf)
+    empty_buffers.cleanup({
+        keep = { dashboard_buf },
+    })
 end
 
 local function leader_quit(force)
@@ -312,7 +307,7 @@ local function leader_quit(force)
             if close_target_window_count() > 1 then
                 pcall(vim.api.nvim_win_close, current_win, true)
             else
-                pcall(vim.cmd, "DashboardHome")
+                open_dashboard_home()
             end
         end
 
@@ -334,7 +329,11 @@ local function leader_quit(force)
         return
     end
 
-    if is_empty_unlisted_buffer(current_buf) and close_target_window_count() > 1 then
+    if
+        empty_buffers.is_deletable(current_buf)
+        and not vim.bo[current_buf].buflisted
+        and close_target_window_count() > 1
+    then
         local closed = pcall(vim.api.nvim_win_close, current_win, true)
 
         if closed and vim.api.nvim_buf_is_valid(current_buf) then
@@ -370,7 +369,7 @@ vim.keymap.set("n", "<leader>h", function()
         return
     end
 
-    pcall(vim.cmd, "DashboardHome")
+    open_dashboard_home()
 end, {
     noremap = true,
     silent = true,
@@ -405,7 +404,6 @@ vim.api.nvim_create_autocmd("TermOpen", {
             if
                 vim.api.nvim_buf_is_valid(args.buf)
                 and vim.bo[args.buf].buftype == "terminal"
-                and vim.bo[args.buf].filetype ~= "FloatingTerminal"
             then
                 vim.keymap.set("n", "<leader>tc", terminal.clear_current_terminal, {
                     buffer = args.buf,
@@ -418,10 +416,12 @@ vim.api.nvim_create_autocmd("TermOpen", {
     end,
 })
 
-vim.keymap.set("n", "<leader>`", terminal.open_float_terminal, {
+vim.keymap.set("n", "<leader>`", function()
+    floating.toggle("`")
+end, {
     noremap = true,
     silent = true,
-    desc = "Toggle floating terminal",
+    desc = "Toggle floating slot ~",
 })
 
 for slot = 0, 9 do

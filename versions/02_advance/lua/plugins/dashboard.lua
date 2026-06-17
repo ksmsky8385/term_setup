@@ -290,16 +290,33 @@ return {
                 and vim.bo[buf].filetype == "alpha"
         end
 
+        local function is_floating_slot_window(win)
+            local ok, floating = pcall(require, "config.floating")
+
+            if not ok then
+                return false
+            end
+
+            if win then
+                return floating.is_slot_window(win)
+            end
+
+            return floating.is_slot_window()
+        end
+
         local function regular_window_count()
             local count = 0
 
             for _, win in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
                 if vim.api.nvim_win_is_valid(win) then
+                    local config = vim.api.nvim_win_get_config(win)
                     local buf = vim.api.nvim_win_get_buf(win)
                     local filetype = vim.bo[buf].filetype
 
                     if
-                        filetype ~= "FloatingTerminal"
+                        config.relative == ""
+                        and filetype ~= "FloatingTerminal"
+                        and filetype ~= "FloatingSlot"
                         and filetype ~= "NvimTree"
                         and filetype ~= "notify"
                     then
@@ -312,6 +329,10 @@ return {
         end
 
         local function remember_current_buffer()
+            if is_floating_slot_window() then
+                return
+            end
+
             local buf = vim.api.nvim_get_current_buf()
 
             if is_returnable_buffer(buf) then
@@ -320,6 +341,10 @@ return {
         end
 
         local function return_to_previous_buffer()
+            if is_floating_slot_window() then
+                return false
+            end
+
             local previous_buf = vim.w.config_dashboard_previous_buf
 
             if previous_buf and is_returnable_buffer(previous_buf) then
@@ -448,6 +473,14 @@ return {
             dashboard.section.header.val = make_header()
             alpha.setup(dashboard.opts)
             vim.cmd("Alpha")
+
+            local ok_empty, empty_buffers = pcall(require, "config.empty_buffers")
+
+            if ok_empty then
+                empty_buffers.cleanup({
+                    keep = { vim.api.nvim_get_current_buf() },
+                })
+            end
         end, {})
     end,
 }

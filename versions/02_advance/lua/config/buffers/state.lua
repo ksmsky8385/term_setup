@@ -57,12 +57,6 @@ function M.movable(buf)
         return false
     end
 
-    local ok_floating, floating = pcall(require, "config.floating")
-
-    if ok_floating and floating.is_slot_buffer(buf) then
-        return false
-    end
-
     local filetype = vim.bo[buf].filetype
 
     if

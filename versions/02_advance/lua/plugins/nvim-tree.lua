@@ -52,6 +52,14 @@ return {
             end
 
             vim.cmd("enew")
+
+            local ok_empty, empty_buffers = pcall(require, "config.empty_buffers")
+
+            if ok_empty then
+                empty_buffers.cleanup({
+                    keep = { vim.api.nvim_get_current_buf() },
+                })
+            end
         end
 
         local function restore_nvim_tree_highlights()
@@ -306,6 +314,13 @@ return {
                 return
             end
 
+            local ok_floating, floating = pcall(require, "config.floating")
+
+            if ok_floating and floating.is_slot_window(target_win) then
+                vim.notify("Floating slots do not support splits.", vim.log.levels.WARN)
+                return
+            end
+
             vim.api.nvim_set_current_win(target_win)
             window_picker.remember_window(target_win)
             vim.cmd(split_cmd)
@@ -313,6 +328,14 @@ return {
             local split_win = vim.api.nvim_get_current_win()
 
             open_file_in_window(node, split_win)
+
+            local ok_empty, empty_buffers = pcall(require, "config.empty_buffers")
+
+            if ok_empty then
+                empty_buffers.cleanup({
+                    keep = { vim.api.nvim_win_get_buf(split_win) },
+                })
+            end
         end
 
         local function open_node(mode)

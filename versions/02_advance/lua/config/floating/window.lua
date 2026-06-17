@@ -19,6 +19,7 @@ end
 
 local function floating_config(slot_id)
     local width, height = floating_size()
+    local title = state.label(slot_id)
 
     return {
         relative = "editor",
@@ -28,7 +29,7 @@ local function floating_config(slot_id)
         col = math.floor((vim.o.columns - width) / 2),
         style = "minimal",
         border = "rounded",
-        title = " [F" .. slot_id .. "] ",
+        title = " [" .. title .. "] ",
         title_pos = "center",
     }
 end
@@ -39,14 +40,16 @@ local function title_for_buffer(slot_id, buf)
     if state.valid_buffer(buf) then
         local path = vim.api.nvim_buf_get_name(buf)
 
-        if path ~= "" then
+        if vim.bo[buf].buftype == "terminal" then
+            name = vim.fn.fnamemodify(vim.o.shell, ":t") .. " [Terminal]"
+        elseif path ~= "" then
             name = vim.fn.fnamemodify(path, ":t")
         elseif vim.bo[buf].filetype ~= "alpha" and vim.bo[buf].filetype ~= state.SLOT_FILETYPE then
             name = "[No Name]"
         end
     end
 
-    return " [F" .. slot_id .. "] " .. name .. " "
+    return " [" .. state.label(slot_id) .. "] " .. name .. " "
 end
 
 local function configure_window(win)
@@ -142,7 +145,7 @@ function M.hide_slot(slot_id)
     M.save_view(item)
     pcall(vim.api.nvim_win_close, item.win, true)
     item.win = nil
-    buffers.cleanup_hidden_listed_empty()
+    buffers.cleanup_empty()
 end
 
 function M.hide_other_slots(active_slot_id)

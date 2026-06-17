@@ -1,4 +1,5 @@
 local M = {}
+local empty_buffers = require("config.empty_buffers")
 
 local BUFFER_TERMINAL_KIND = "buffer"
 local FLOAT_TERMINAL_KIND = "float"
@@ -207,10 +208,20 @@ function M.create_buffer_terminal(opts)
     vim.b[terminal_buf].terminal_kind = BUFFER_TERMINAL_KIND
     vim.bo[terminal_buf].buflisted = true
 
+    local current_win = vim.api.nvim_get_current_win()
+    local ok_floating, floating = pcall(require, "config.floating")
+
+    if ok_floating and floating.is_slot_window(current_win) then
+        floating.set_window_buffer(current_win, terminal_buf)
+    end
+
     if vim.b[terminal_buf].terminal_job_id then
         stop_terminal_insert()
     end
 
+    empty_buffers.cleanup({
+        keep = { terminal_buf },
+    })
     refresh_tree()
 end
 
@@ -390,6 +401,8 @@ function M.clear_current_terminal()
     local current_win = vim.api.nvim_get_current_win()
     local old_job_id = vim.b[current_buf].terminal_job_id
     local new_buf = vim.api.nvim_create_buf(true, false)
+    local ok_floating, floating = pcall(require, "config.floating")
+    local is_slot_window = ok_floating and floating.is_slot_window(current_win)
 
     vim.b[current_buf].terminal_closing = true
 
@@ -401,18 +414,28 @@ function M.clear_current_terminal()
     local new_job_id = vim.fn.termopen(vim.o.shell)
     vim.b[new_buf].terminal_job_id = new_job_id
 
+    if is_slot_window then
+        floating.set_window_buffer(current_win, new_buf)
+    end
+
     if job_running(old_job_id) then
         pcall(vim.fn.jobstop, old_job_id)
     end
 
     stop_terminal_insert()
     refresh_tree()
+    empty_buffers.cleanup({
+        keep = { new_buf },
+    })
 
     vim.schedule(function()
         if valid_buffer(current_buf) then
             pcall(vim.api.nvim_buf_delete, current_buf, { force = true })
         end
 
+        empty_buffers.cleanup({
+            keep = { new_buf },
+        })
         refresh_tree()
     end)
 end
@@ -453,6 +476,7 @@ function M.kill_current_terminal(force)
         pcall(vim.api.nvim_buf_delete, current_buf, { force = force or was_running })
     end
 
+    empty_buffers.cleanup()
     refresh_tree()
 end
 

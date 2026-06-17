@@ -1,7 +1,11 @@
 local M = {}
+local empty_buffers = require("config.empty_buffers")
 
 local function back_to_dashboard()
     pcall(vim.cmd, "DashboardHome")
+    empty_buffers.cleanup({
+        keep = { vim.api.nvim_get_current_buf() },
+    })
 end
 
 function M.open()
@@ -12,6 +16,9 @@ function M.open()
     vim.bo.modifiable = true
     vim.b.config_about_neovim = true
     vim.wo.cursorline = true
+    empty_buffers.cleanup({
+        keep = { vim.api.nvim_get_current_buf() },
+    })
 
     local version = vim.version()
     local version_text = string.format(

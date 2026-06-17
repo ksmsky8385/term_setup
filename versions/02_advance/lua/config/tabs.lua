@@ -1,5 +1,6 @@
 local M = {}
 local telescope_picker = require("config.picker")
+local empty_buffers = require("config.empty_buffers")
 
 local function hl(name)
     local ok, value = pcall(vim.api.nvim_get_hl, 0, {
@@ -150,6 +151,10 @@ function M.new()
             force = true,
         })
     end
+
+    empty_buffers.cleanup({
+        keep = { vim.api.nvim_get_current_buf() },
+    })
 end
 
 function M.close()

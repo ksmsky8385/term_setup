@@ -1,6 +1,7 @@
 local M = {}
 
 local session_layout = require("config.sessions.layout")
+local empty_buffers = require("config.empty_buffers")
 
 local function tabpage_windows(tab)
     return vim.tbl_filter(function(win)
@@ -179,12 +180,14 @@ function M.after_load(metadata)
 
     if session_layout.restore(metadata.layout) then
         restore_floating_slots(metadata.floating_slots)
+        empty_buffers.cleanup()
         return
     end
 
     restore_terminals(metadata.terminals)
     restore_floating_slots(metadata.floating_slots)
     restore_tree(metadata.tree)
+    empty_buffers.cleanup()
 end
 
 return M

@@ -7,6 +7,7 @@ local function visible_tab_labels_by_buffer()
     local ok_picker, window_picker = pcall(require, "config.window_picker")
     local labels = {}
     local max_width = 0
+    local floating_labels = {}
     local show_tab_label = vim.fn.tabpagenr("$") > 1
     if not ok_picker then
         return labels, max_width
@@ -15,6 +16,7 @@ local function visible_tab_labels_by_buffer()
     for tabnr, tabpage in ipairs(vim.api.nvim_list_tabpages()) do
         local tab_labels = {}
         local previous_tabpage = vim.api.nvim_get_current_tabpage()
+        local ok_floating, floating = pcall(require, "config.floating")
 
         vim.api.nvim_set_current_tabpage(tabpage)
 
@@ -23,8 +25,18 @@ local function visible_tab_labels_by_buffer()
             local window_label = window_picker.label_for_window(win, policy.window_picker_exclude)
 
             if state.valid_listed(buf) and window_label ~= "" then
-                tab_labels[buf] = tab_labels[buf] or {}
-                table.insert(tab_labels[buf], window_label)
+                if ok_floating and floating.is_slot_window(win) then
+                    labels[buf] = labels[buf] or {}
+                    floating_labels[buf] = floating_labels[buf] or {}
+
+                    if not floating_labels[buf][window_label] then
+                        table.insert(labels[buf], "[" .. window_label .. "]")
+                        floating_labels[buf][window_label] = true
+                    end
+                else
+                    tab_labels[buf] = tab_labels[buf] or {}
+                    table.insert(tab_labels[buf], window_label)
+                end
             end
         end
 
@@ -45,6 +57,24 @@ local function visible_tab_labels_by_buffer()
         end
     end
 
+    local ok_floating, floating = pcall(require, "config.floating")
+
+    if ok_floating and type(floating.assigned_slots_by_buffer) == "function" then
+        for buf, slots in pairs(floating.assigned_slots_by_buffer()) do
+            if state.valid_listed(buf) then
+                labels[buf] = labels[buf] or {}
+                floating_labels[buf] = floating_labels[buf] or {}
+
+                for _, slot in ipairs(slots) do
+                    if not floating_labels[buf][slot.label] then
+                        table.insert(labels[buf], "[" .. slot.label .. "]")
+                        floating_labels[buf][slot.label] = true
+                    end
+                end
+            end
+        end
+    end
+
     for buf, buf_labels in pairs(labels) do
         labels[buf] = table.concat(buf_labels, " ")
         max_width = math.max(max_width, #labels[buf])
@@ -57,19 +87,6 @@ local function visible_tab_labels_by_buffer()
             if terminal.is_float_terminal(buf) then
                 labels[buf] = terminal.float_terminal_label()
                 max_width = math.max(max_width, #labels[buf])
-            end
-        end
-    end
-
-    local ok_floating, floating = pcall(require, "config.floating")
-
-    if ok_floating then
-        for _, buf in ipairs(state.listed()) do
-            local label = floating.slot_label_for_buffer(buf)
-
-            if label then
-                labels[buf] = label
-                max_width = math.max(max_width, #label)
             end
         end
     end
@@ -109,7 +126,9 @@ function M.entry_maker(opts, telescope)
             local prefix = string.rep(" ", label_width + 3)
 
             if label then
-                prefix = string.format("%-" .. (label_width + 2) .. "s ", "[" .. label .. "]")
+                local rendered_label = label:sub(1, 1) == "[" and label or "[" .. label .. "]"
+
+                prefix = string.format("%-" .. (label_width + 2) .. "s ", rendered_label)
             end
 
             highlights = highlights or {}

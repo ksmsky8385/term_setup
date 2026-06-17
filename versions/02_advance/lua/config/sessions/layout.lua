@@ -1,4 +1,5 @@
 local M = {}
+local empty_buffers = require("config.empty_buffers")
 
 local VERSION = 1
 
@@ -564,38 +565,8 @@ local function restore_tab(tab)
     end
 end
 
-local function visible_buffers()
-    local buffers = {}
-
-    for _, win in ipairs(vim.api.nvim_list_wins()) do
-        if valid_window(win) then
-            buffers[vim.api.nvim_win_get_buf(win)] = true
-        end
-    end
-
-    return buffers
-end
-
-local function deletable_empty_buffer(buf)
-    return valid_buffer(buf)
-        and vim.api.nvim_buf_get_name(buf) == ""
-        and vim.bo[buf].buftype == ""
-        and vim.bo[buf].filetype == ""
-        and not vim.bo[buf].modified
-        and vim.api.nvim_buf_line_count(buf) == 1
-        and vim.api.nvim_buf_get_lines(buf, 0, 1, false)[1] == ""
-end
-
 local function cleanup_hidden_empty_buffers()
-    local visible = visible_buffers()
-
-    for _, buf in ipairs(vim.api.nvim_list_bufs()) do
-        if not visible[buf] and deletable_empty_buffer(buf) then
-            pcall(vim.api.nvim_buf_delete, buf, {
-                force = true,
-            })
-        end
-    end
+    empty_buffers.cleanup()
 end
 
 function M.restore(snapshot)

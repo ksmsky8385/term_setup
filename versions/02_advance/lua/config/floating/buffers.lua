@@ -1,4 +1,5 @@
 local state = require("config.floating.state")
+local empty_buffers = require("config.empty_buffers")
 
 local M = {}
 
@@ -22,10 +23,22 @@ function M.listed_empty()
     return buffers
 end
 
-function M.hidden_listed_empty()
+function M.empty()
     local buffers = {}
 
-    for buf in pairs(M.listed_empty()) do
+    for _, buf in ipairs(vim.api.nvim_list_bufs()) do
+        if empty_buffers.is_deletable(buf) then
+            buffers[buf] = true
+        end
+    end
+
+    return buffers
+end
+
+function M.hidden_empty()
+    local buffers = {}
+
+    for buf in pairs(M.empty()) do
         if #state.visible_windows_for_buffer(buf) == 0 then
             buffers[buf] = true
         end
@@ -34,12 +47,16 @@ function M.hidden_listed_empty()
     return buffers
 end
 
-function M.cleanup_hidden_listed_empty()
-    for buf in pairs(M.hidden_listed_empty()) do
+function M.cleanup_hidden_empty()
+    for buf in pairs(M.hidden_empty()) do
         pcall(vim.api.nvim_buf_delete, buf, {
             force = true,
         })
     end
+end
+
+function M.cleanup_empty()
+    empty_buffers.cleanup()
 end
 
 function M.cleanup_new_listed_empty(before)

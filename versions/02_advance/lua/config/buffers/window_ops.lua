@@ -2,8 +2,20 @@ local policy = require("config.buffers.policy")
 local state = require("config.buffers.state")
 local tabs = require("config.buffers.window_tabs")
 local visibility = require("config.buffers.window_visibility")
+local empty_buffers = require("config.empty_buffers")
 
 local M = {}
+
+local function set_window_buffer(win, buf)
+    local ok_floating, floating = pcall(require, "config.floating")
+
+    if ok_floating and floating.is_slot_window(win) then
+        return floating.set_window_buffer(win, buf)
+    end
+
+    vim.api.nvim_win_set_buf(win, buf)
+    return true
+end
 
 local function can_delete_unique_window_buffer(buf, force)
     if not vim.api.nvim_buf_is_valid(buf) then
@@ -39,13 +51,13 @@ local function move_between_windows(buf, source_win, target_win)
 
     if source_win and vim.api.nvim_win_is_valid(source_win) then
         if state.movable(target_buf) then
-            vim.api.nvim_win_set_buf(source_win, target_buf)
+            set_window_buffer(source_win, target_buf)
         else
-            vim.api.nvim_win_set_buf(source_win, state.fallback_for_displaced())
+            set_window_buffer(source_win, state.fallback_for_displaced())
         end
     end
 
-    vim.api.nvim_win_set_buf(target_win, buf)
+    set_window_buffer(target_win, buf)
 
     return true
 end
@@ -140,7 +152,7 @@ function M.open_buffer_in_window(buf, target_win, opts)
             end
         end
 
-        vim.api.nvim_win_set_buf(target_win, buf)
+        set_window_buffer(target_win, buf)
 
         if can_delete then
             local ok, err = state.delete(old_buf, opts.force)
@@ -153,7 +165,7 @@ function M.open_buffer_in_window(buf, target_win, opts)
         return true
     end
 
-    vim.api.nvim_win_set_buf(target_win, buf)
+    set_window_buffer(target_win, buf)
 
     return true
 end
@@ -168,6 +180,13 @@ function M.open_buffer_in_split(buf, target_win, split_cmd)
         return false
     end
 
+    local ok_floating, floating = pcall(require, "config.floating")
+
+    if ok_floating and floating.is_slot_window(target_win) then
+        vim.notify("Floating slots do not support splits.", vim.log.levels.WARN)
+        return false
+    end
+
     vim.api.nvim_set_current_win(target_win)
 
     local ok, err = pcall(vim.cmd, split_cmd)
@@ -178,6 +197,9 @@ function M.open_buffer_in_split(buf, target_win, split_cmd)
     end
 
     vim.api.nvim_win_set_buf(0, buf)
+    empty_buffers.cleanup({
+        keep = { buf },
+    })
 
     return true
 end

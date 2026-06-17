@@ -99,6 +99,14 @@ local function clear_session_load_buffers(buffers, force)
         end
     end
 
+    local ok_empty, empty_buffers = pcall(require, "config.empty_buffers")
+
+    if ok_empty then
+        empty_buffers.cleanup({
+            keep = { keep },
+        })
+    end
+
     return true
 end
 

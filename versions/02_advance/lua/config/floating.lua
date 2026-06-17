@@ -12,6 +12,12 @@ local function hide_float_terminal_if_visible()
     end
 end
 
+local function terminal_job_running(buf)
+    local job_id = vim.b[buf].terminal_job_id
+
+    return type(job_id) == "number" and vim.fn.jobwait({ job_id }, 0)[1] == -1
+end
+
 local function show_home(slot_id)
     local item = state.slot(slot_id)
     local buf = buffers.create_home(slot_id)
@@ -40,7 +46,7 @@ local function show_home(slot_id)
     item.buf = current
     state.mark_buffer(current, slot_id)
     buffers.cleanup_new_listed_empty(listed_empty_before)
-    buffers.cleanup_hidden_listed_empty()
+    buffers.cleanup_empty()
     window.update_title(slot_id)
 end
 
@@ -52,6 +58,10 @@ function M.window_slot_id(win)
     return state.window_slot_id(win)
 end
 
+function M.slot_label(slot_id)
+    return state.label(slot_id)
+end
+
 function M.is_slot_buffer(buf)
     return state.is_slot_buffer(buf)
 end
@@ -60,12 +70,20 @@ function M.slot_label_for_buffer(buf)
     return state.slot_label_for_buffer(buf)
 end
 
+function M.assigned_slots_by_buffer()
+    return state.assigned_slots_by_buffer()
+end
+
 function M.slot_sort_rank(buf)
     return state.slot_sort_rank(buf)
 end
 
 function M.current_slots()
     return state.current_slots()
+end
+
+function M.slot_ids()
+    return state.slot_ids()
 end
 
 function M.restore_slot(slot_id, file, opts)
@@ -94,6 +112,27 @@ function M.restore_slot(slot_id, file, opts)
     return true
 end
 
+function M.open_slot(slot_id)
+    local item = state.slot(slot_id)
+
+    window.hide_other_slots(slot_id)
+    hide_float_terminal_if_visible()
+
+    if state.valid_window(item.win) then
+        vim.api.nvim_set_current_win(item.win)
+        return item.win
+    end
+
+    if state.valid_buffer(item.buf) then
+        return window.open(slot_id, item.buf)
+    end
+
+    show_home(slot_id)
+    buffers.cleanup_empty()
+
+    return item.win
+end
+
 function M.show_buffer_slot(buf)
     if not state.valid_buffer(buf) then
         return false
@@ -110,6 +149,7 @@ function M.show_buffer_slot(buf)
                 window.open(slot_id, buf)
             end
 
+            buffers.cleanup_empty()
             return true
         end
     end
@@ -134,6 +174,7 @@ function M.show_buffer_slot(buf)
     end
 
     window.update_title(slot_id)
+    buffers.cleanup_empty()
 
     return true
 end
@@ -146,15 +187,7 @@ function M.toggle(slot_id)
         return
     end
 
-    window.hide_other_slots(slot_id)
-    hide_float_terminal_if_visible()
-
-    if state.valid_buffer(item.buf) then
-        window.open(slot_id, item.buf)
-        return
-    end
-
-    show_home(slot_id)
+    M.open_slot(slot_id)
 end
 
 function M.open_buffer(buf, opts)
@@ -192,7 +225,37 @@ function M.open_buffer(buf, opts)
         buffers.safe_delete_old(old_buf, opts.force)
     end
 
-    buffers.cleanup_hidden_listed_empty()
+    buffers.cleanup_empty()
+
+    return true
+end
+
+function M.set_window_buffer(win, buf)
+    if not state.valid_window(win) or not state.valid_buffer(buf) then
+        return false
+    end
+
+    local slot_id = M.window_slot_id(win)
+
+    if slot_id == nil then
+        return false
+    end
+
+    local item = state.slot(slot_id)
+    local old_buf = vim.api.nvim_win_get_buf(win)
+
+    vim.api.nvim_win_set_buf(win, buf)
+    item.win = win
+    item.buf = buf
+    state.mark_window(win, slot_id)
+    state.mark_buffer(buf, slot_id)
+    vim.api.nvim_set_current_win(win)
+    window.update_title(slot_id)
+
+    if old_buf ~= buf then
+        state.clear_buffer_slot(old_buf, slot_id)
+        buffers.cleanup_empty()
+    end
 
     return true
 end
@@ -221,9 +284,8 @@ function M.close_current(force)
     local item = state.slot(slot_id)
     local buf = vim.api.nvim_win_get_buf(win)
 
-    if vim.bo[buf].filetype == "alpha" or vim.bo[buf].filetype == state.SLOT_FILETYPE then
-        pcall(vim.api.nvim_win_close, win, true)
-        item.win = nil
+    if vim.bo[buf].buftype == "terminal" and terminal_job_running(buf) and not force then
+        vim.notify("Terminal process is still running. Use Space Q to force.", vim.log.levels.WARN)
         return true
     end
 
@@ -232,8 +294,16 @@ function M.close_current(force)
         return true
     end
 
-    show_home(slot_id)
     state.clear_buffer_slot(buf, slot_id)
+    item.buf = nil
+
+    if state.valid_window(win) then
+        pcall(vim.api.nvim_win_close, win, true)
+    end
+
+    item.win = nil
+    item.view = nil
+    item.cursor = nil
 
     if #state.visible_windows_for_buffer(buf) == 0 and state.valid_buffer(buf) then
         local ok, err = pcall(vim.api.nvim_buf_delete, buf, {
@@ -244,6 +314,8 @@ function M.close_current(force)
             vim.notify("Failed to delete buffer: " .. err, vim.log.levels.ERROR)
         end
     end
+
+    buffers.cleanup_empty()
 
     return true
 end

@@ -1,7 +1,7 @@
 local M = {}
 
-local picker_chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890"
-local focus_picker_chars = "ABCDEFGHIJKLMNOPQRSUVWXYZ1234567890"
+local picker_chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+local focus_picker_chars = "ABCDEFGHIJKLMNOPQRSUVWXYZ"
 local active_picker = nil
 local next_window_order = 1
 
@@ -116,6 +116,70 @@ local function sort_by_window_order(windows)
     end
 end
 
+local function floating_slot_id(win)
+    local ok_floating, floating = pcall(require, "config.floating")
+
+    if not ok_floating or not floating.is_slot_window(win) then
+        return nil
+    end
+
+    return floating.window_slot_id(win)
+end
+
+local function floating_slot_label(slot_id)
+    local ok_floating, floating = pcall(require, "config.floating")
+
+    if ok_floating and type(floating.slot_label) == "function" then
+        return floating.slot_label(slot_id)
+    end
+
+    if tostring(slot_id) == "`" then
+        return "F~"
+    end
+
+    return "F" .. tostring(slot_id)
+end
+
+local function picker_key_for_slot(slot_id)
+    slot_id = tostring(slot_id)
+
+    if slot_id == "`" then
+        return "`"
+    end
+
+    return slot_id
+end
+
+local function floating_slot_ids()
+    local ok_floating, floating = pcall(require, "config.floating")
+
+    if ok_floating and type(floating.slot_ids) == "function" then
+        return floating.slot_ids()
+    end
+
+    return {}
+end
+
+local function open_floating_slot(slot_id)
+    local ok_floating, floating = pcall(require, "config.floating")
+
+    if not ok_floating or type(floating.open_slot) ~= "function" then
+        return nil
+    end
+
+    return floating.open_slot(slot_id)
+end
+
+local function add_slot_key(char_map, slot_id, target)
+    local key = picker_key_for_slot(slot_id)
+
+    char_map[key] = target
+
+    if key == "`" then
+        char_map["~"] = target
+    end
+end
+
 local function is_excluded(win, exclude)
     if not vim.api.nvim_win_is_valid(win) then
         return true
@@ -124,12 +188,6 @@ local function is_excluded(win, exclude)
     local config = vim.api.nvim_win_get_config(win)
 
     if not config.focusable or config.hide or config.external then
-        return true
-    end
-
-    local ok_floating, floating = pcall(require, "config.floating")
-
-    if ok_floating and floating.is_slot_window(win) then
         return true
     end
 
@@ -167,14 +225,26 @@ function M.label_for_window(win, exclude)
         return ""
     end
 
+    local slot_id = floating_slot_id(win)
+
+    if slot_id ~= nil then
+        return floating_slot_label(slot_id)
+    end
+
     local index = 1
 
     for _, candidate in ipairs(M.selectable_windows(exclude)) do
+        if floating_slot_id(candidate) ~= nil then
+            goto continue
+        end
+
         if candidate == win then
             return picker_chars:sub(index, index)
         end
 
         index = index + 1
+
+        ::continue::
     end
 
     return ""
@@ -185,7 +255,6 @@ function M.remember_window(win)
 
     if not is_excluded(win, {
         filetype = {
-            "FloatingSlot",
             "NvimTree",
             "notify",
         },
@@ -243,7 +312,7 @@ local function focusable_window(win)
 
     local filetype = vim.bo[buf].filetype
 
-    return filetype ~= "FloatingSlot" and filetype ~= "notify"
+    return filetype ~= "notify"
 end
 
 local function restore_picker(previous, laststatus, fillchars)
@@ -253,7 +322,18 @@ local function restore_picker(previous, laststatus, fillchars)
     for win, options in pairs(previous) do
         if vim.api.nvim_win_is_valid(win) then
             for option, value in pairs(options) do
-                vim.api.nvim_set_option_value(option, value, { win = win })
+                if option ~= "title" and option ~= "title_pos" then
+                    vim.api.nvim_set_option_value(option, value, { win = win })
+                end
+            end
+
+            local config = vim.api.nvim_win_get_config(win)
+
+            if config.relative ~= "" then
+                pcall(vim.api.nvim_win_set_config, win, {
+                    title = options.title,
+                    title_pos = options.title_pos,
+                })
             end
         end
     end
@@ -265,20 +345,31 @@ end
 
 function M.pick_window(exclude)
     local selectable = M.selectable_windows(exclude)
+    local slot_ids = floating_slot_ids()
 
     if #selectable == 0 then
-        clear_prompt()
-        return -1
+        if #slot_ids == 0 then
+            clear_prompt()
+            return -1
+        end
     end
 
-    if #selectable == 1 then
+    if #selectable == 1 and #slot_ids == 0 then
         clear_prompt()
         return selectable[1]
     end
 
-    if #picker_chars < #selectable then
+    local regular_count = 0
+
+    for _, win in ipairs(selectable) do
+        if floating_slot_id(win) == nil then
+            regular_count = regular_count + 1
+        end
+    end
+
+    if #picker_chars < regular_count then
         vim.notify(
-            string.format("More windows (%d) than picker chars (%d).", #selectable, #picker_chars),
+            string.format("More windows (%d) than picker chars (%d).", regular_count, #picker_chars),
             vim.log.levels.ERROR
         )
         return nil
@@ -287,6 +378,7 @@ function M.pick_window(exclude)
     local previous = {}
     local char_map = {}
     local window_map = {}
+    local visible_slots = {}
     local laststatus = vim.o.laststatus
     local fillchars = vim.opt.fillchars:get()
     local old_stl = fillchars.stl
@@ -299,8 +391,26 @@ function M.pick_window(exclude)
     fillchars.stl = old_stl
     fillchars.stlnc = old_stlnc
 
-    for index, win in ipairs(selectable) do
-        local char = picker_chars:sub(index, index)
+    local picker_index = 1
+
+    for _, win in ipairs(selectable) do
+        local slot_id = floating_slot_id(win)
+        local char = slot_id and picker_key_for_slot(slot_id) or picker_chars:sub(picker_index, picker_index)
+
+        if slot_id then
+            visible_slots[tostring(slot_id)] = true
+        end
+
+        if not slot_id then
+            picker_index = picker_index + 1
+        end
+
+        if char == "" then
+            vim.notify("More windows than picker chars.", vim.log.levels.ERROR)
+            return nil
+        end
+
+        local config = vim.api.nvim_win_get_config(win)
         local ok_status, statusline = pcall(vim.api.nvim_get_option_value, "statusline", {
             win = win,
         })
@@ -311,20 +421,48 @@ function M.pick_window(exclude)
         previous[win] = {
             statusline = ok_status and statusline or "",
             winhl = ok_hl and winhl or "",
+            title = config.title,
+            title_pos = config.title_pos,
         }
-        char_map[char] = win
+
+        if slot_id then
+            add_slot_key(char_map, slot_id, win)
+        else
+            char_map[char] = win
+        end
+
         window_map[win] = true
 
-        vim.api.nvim_set_option_value(
-            "statusline",
-            "%" .. win .. "@v:lua.require'config.window_picker'.on_picker_statusline_click@%=" .. char .. "%=%T",
-            { win = win }
-        )
+        local label = slot_id and floating_slot_label(slot_id) or char
+
+        if config.relative ~= "" then
+            pcall(vim.api.nvim_win_set_config, win, {
+                title = " [" .. label .. "] ",
+                title_pos = "center",
+            })
+        else
+            vim.api.nvim_set_option_value(
+                "statusline",
+                "%" .. win .. "@v:lua.require'config.window_picker'.on_picker_statusline_click@%=" .. label .. "%=%T",
+                { win = win }
+            )
+        end
+
         vim.api.nvim_set_option_value(
             "winhl",
             "StatusLine:NvimTreeWindowPicker,StatusLineNC:NvimTreeWindowPicker",
             { win = win }
         )
+    end
+
+    for _, slot_id in ipairs(slot_ids) do
+        slot_id = tostring(slot_id)
+
+        if not visible_slots[slot_id] then
+            add_slot_key(char_map, slot_id, function()
+                return open_floating_slot(slot_id)
+            end)
+        end
     end
 
     active_picker = {
@@ -377,8 +515,14 @@ function M.pick_window(exclude)
             break
         end
 
-        if char_map[input] then
-            picked = char_map[input]
+        local mapped = char_map[input]
+
+        if mapped then
+            if type(mapped) == "function" then
+                picked = mapped()
+            else
+                picked = mapped
+            end
             break
         end
     end
@@ -470,8 +614,11 @@ function M.focus_window()
     for _, win in ipairs(windows) do
         local buf = vim.api.nvim_win_get_buf(win)
         local char
+        local slot_id = floating_slot_id(win)
 
-        if vim.bo[buf].filetype == "NvimTree" then
+        if slot_id ~= nil then
+            char = picker_key_for_slot(slot_id)
+        elseif vim.bo[buf].filetype == "NvimTree" then
             char = "T"
         else
             char = focus_picker_chars:sub(char_index, char_index)
@@ -484,6 +631,7 @@ function M.focus_window()
             return
         end
 
+        local config = vim.api.nvim_win_get_config(win)
         local ok_status, statusline = pcall(vim.api.nvim_get_option_value, "statusline", {
             win = win,
         })
@@ -494,15 +642,32 @@ function M.focus_window()
         previous[win] = {
             statusline = ok_status and statusline or "",
             winhl = ok_hl and winhl or "",
+            title = config.title,
+            title_pos = config.title_pos,
         }
+
         char_map[char] = win
+        if char == "`" then
+            char_map["~"] = win
+        end
+
         window_map[win] = true
 
-        vim.api.nvim_set_option_value(
-            "statusline",
-            "%" .. win .. "@v:lua.require'config.window_picker'.on_picker_statusline_click@%=" .. char .. "%=%T",
-            { win = win }
-        )
+        local label = slot_id and floating_slot_label(slot_id) or char
+
+        if config.relative ~= "" then
+            pcall(vim.api.nvim_win_set_config, win, {
+                title = " [" .. label .. "] ",
+                title_pos = "center",
+            })
+        else
+            vim.api.nvim_set_option_value(
+                "statusline",
+                "%" .. win .. "@v:lua.require'config.window_picker'.on_picker_statusline_click@%=" .. label .. "%=%T",
+                { win = win }
+            )
+        end
+
         vim.api.nvim_set_option_value(
             "winhl",
             "StatusLine:NvimTreeWindowPicker,StatusLineNC:NvimTreeWindowPicker",
