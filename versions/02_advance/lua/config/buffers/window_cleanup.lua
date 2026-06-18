@@ -4,6 +4,17 @@ local empty_buffers = require("config.empty_buffers")
 
 local M = {}
 
+local function set_window_buffer(win, buf)
+    local ok_floating, floating = pcall(require, "config.floating")
+
+    if ok_floating and floating.is_slot_window(win) then
+        return floating.set_window_buffer(win, buf)
+    end
+
+    vim.api.nvim_win_set_buf(win, buf)
+    return true
+end
+
 local function target_window_count(tabpage)
     local count = 0
 
@@ -55,7 +66,7 @@ function M.fallback_for_cleared_window(win, original_buf)
 
     if not fallback or fallback == original_buf or not vim.api.nvim_buf_is_valid(fallback) then
         fallback = state.fallback_for_deleted()
-        vim.api.nvim_win_set_buf(win, fallback)
+        set_window_buffer(win, fallback)
     end
 
     empty_buffers.cleanup({
@@ -104,7 +115,7 @@ function M.restore_after_failed_delete(buf, cleared)
 
     for _, entry in ipairs(cleared) do
         if vim.api.nvim_win_is_valid(entry.win) then
-            pcall(vim.api.nvim_win_set_buf, entry.win, buf)
+            pcall(set_window_buffer, entry.win, buf)
         end
 
         if vim.api.nvim_buf_is_valid(entry.fallback) then
@@ -139,7 +150,7 @@ function M.clear_listed_except(keep_windows)
                 then
                     local fallback = state.fallback_for_deleted()
 
-                    vim.api.nvim_win_set_buf(win, fallback)
+                    set_window_buffer(win, fallback)
                     table.insert(cleared, {
                         win = win,
                         original = original,
@@ -169,7 +180,7 @@ function M.restore_cleared(cleared)
             vim.api.nvim_win_is_valid(entry.win)
             and vim.api.nvim_buf_is_valid(entry.original)
         then
-            pcall(vim.api.nvim_win_set_buf, entry.win, entry.original)
+            pcall(set_window_buffer, entry.win, entry.original)
         end
 
         if vim.api.nvim_buf_is_valid(entry.fallback) then

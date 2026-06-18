@@ -9,6 +9,20 @@ local function floating_assigned(buf)
     return ok and type(floating.has_assignment) == "function" and floating.has_assignment(buf)
 end
 
+local function hidden_floating_assignment_from_plain_window(buf, win)
+    local ok, floating = pcall(require, "config.floating")
+
+    if
+        not ok
+        or type(floating.has_assignment) ~= "function"
+        or not floating.has_assignment(buf)
+    then
+        return false
+    end
+
+    return not floating.is_slot_window(win)
+end
+
 function M.hidden_replacement(current)
     local candidates = {}
 
@@ -67,10 +81,12 @@ end
 
 function M.delete_current(force)
     local current = vim.api.nvim_get_current_buf()
+    local current_win = vim.api.nvim_get_current_win()
 
-    if windows.all_visible_count(current) > 1 then
-        local current_win = vim.api.nvim_get_current_win()
-
+    if
+        windows.all_visible_count(current) > 1
+        or hidden_floating_assignment_from_plain_window(current, current_win)
+    then
         windows.fallback_for_cleared_window(current_win, current)
 
         if vim.api.nvim_win_is_valid(current_win) then

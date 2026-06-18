@@ -173,6 +173,14 @@ function M.has_assignment(buf)
         end
     end
 
+    local slot_id = M.normalize_slot_id(vim.b[buf].floating_slot_id)
+
+    if slot_id ~= nil then
+        local item = M.slots[slot_id]
+
+        return item == nil or item.buf == nil or item.buf == buf
+    end
+
     return false
 end
 
