@@ -53,8 +53,8 @@ if (( COLUMNS >= 150 )); then
   typeset -g POWERLEVEL9K_SHORTEN_STRATEGY=truncate_to_unique
   typeset -g POWERLEVEL9K_SHORTEN_DIR_LENGTH=99
   typeset -g POWERLEVEL9K_DIR_MAX_LENGTH=0
-
-elif (( COLUMNS >= 50 )); then
+  
+elif (( COLUMNS >= 90 )); then
   typeset -g POWERLEVEL9K_LEFT_PROMPT_ELEMENTS=(
     os_icon
     dir
@@ -64,7 +64,20 @@ elif (( COLUMNS >= 50 )); then
   )
 
   typeset -g POWERLEVEL9K_SHORTEN_STRATEGY=truncate_to_last
-  typeset -g POWERLEVEL9K_SHORTEN_DIR_LENGTH=2
+  typeset -g POWERLEVEL9K_SHORTEN_DIR_LENGTH=3
+  typeset -g POWERLEVEL9K_DIR_MAX_LENGTH=0
+
+elif (( COLUMNS >= 60 )); then
+  typeset -g POWERLEVEL9K_LEFT_PROMPT_ELEMENTS=(
+    os_icon
+    dir
+    vcs
+    newline
+    prompt_char
+  )
+
+  typeset -g POWERLEVEL9K_SHORTEN_STRATEGY=truncate_to_last
+  typeset -g POWERLEVEL9K_SHORTEN_DIR_LENGTH=1
   typeset -g POWERLEVEL9K_DIR_MAX_LENGTH=0
 
 else
