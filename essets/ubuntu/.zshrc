@@ -64,7 +64,7 @@ elif (( COLUMNS >= 90 )); then
   )
 
   typeset -g POWERLEVEL9K_SHORTEN_STRATEGY=truncate_to_last
-  typeset -g POWERLEVEL9K_SHORTEN_DIR_LENGTH=3
+  typeset -g POWERLEVEL9K_SHORTEN_DIR_LENGTH=2
   typeset -g POWERLEVEL9K_DIR_MAX_LENGTH=0
 
 elif (( COLUMNS >= 60 )); then
