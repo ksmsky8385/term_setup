@@ -10,7 +10,6 @@ return {
             filetype = {
                 "NvimTree",
                 "notify",
-                "FloatingTerminal",
             },
         }
 

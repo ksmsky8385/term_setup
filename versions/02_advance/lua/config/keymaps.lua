@@ -69,14 +69,12 @@ if window_picker.setup then
 end
 
 local ignored_quit_filetypes = {
-    FloatingTerminal = true,
     NvimTree = true,
     alpha = true,
     notify = true,
 }
 
 local ignored_save_filetypes = {
-    FloatingTerminal = true,
     NvimTree = true,
     TelescopePreview = true,
     TelescopePrompt = true,
@@ -180,8 +178,7 @@ local function close_target_window_count()
             local filetype = vim.bo[buf].filetype
 
             if
-                filetype ~= "FloatingTerminal"
-                and filetype ~= "FloatingSlot"
+                filetype ~= "FloatingSlot"
                 and filetype ~= "NvimTree"
                 and filetype ~= "notify"
             then
@@ -282,11 +279,6 @@ local function leader_quit(force)
     end
 
     if force and vim.bo[current_buf].buftype == "terminal" then
-        if terminal.is_float_terminal(current_buf) then
-            terminal.kill_current_terminal(force)
-            return
-        end
-
         local replaced = buffers.delete_current_to_hidden(force)
 
         if replaced ~= nil then
@@ -619,7 +611,6 @@ vim.keymap.set("n", "<leader>ww", window_picker.focus_window, {
 vim.keymap.set("n", "<leader>wr", function()
     window_picker.swap_current_window_label({
         filetype = {
-            "FloatingTerminal",
             "NvimTree",
             "notify",
         },

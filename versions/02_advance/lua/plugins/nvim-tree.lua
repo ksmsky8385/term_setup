@@ -111,7 +111,6 @@ return {
 
             for _, win in ipairs(window_picker.selectable_windows({
                 filetype = {
-                    "FloatingTerminal",
                     "NvimTree",
                     "notify",
                 },

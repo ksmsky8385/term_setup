@@ -221,7 +221,6 @@ function M.snapshot()
         if ok_picker and type(window_picker.selectable_windows) == "function" then
             window_picker.selectable_windows({
                 filetype = {
-                    "FloatingTerminal",
                     "NvimTree",
                     "notify",
                 },

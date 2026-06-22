@@ -24,8 +24,7 @@ local function target_window_count(tabpage)
             local filetype = vim.bo[buf].filetype
 
             if
-                filetype ~= "FloatingTerminal"
-                and filetype ~= "FloatingSlot"
+                filetype ~= "FloatingSlot"
                 and filetype ~= "NvimTree"
                 and filetype ~= "TelescopePrompt"
                 and filetype ~= "TelescopeResults"
@@ -130,7 +129,6 @@ function M.clear_listed_except(keep_windows)
     local cleared = {}
     local keep = {}
     local ignored_filetypes = {
-        FloatingTerminal = true,
         NvimTree = true,
         notify = true,
     }

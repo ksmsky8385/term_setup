@@ -80,17 +80,6 @@ local function visible_tab_labels_by_buffer()
         max_width = math.max(max_width, #labels[buf])
     end
 
-    local ok_terminal, terminal = pcall(require, "config.terminal")
-
-    if ok_terminal then
-        for _, buf in ipairs(state.listed()) do
-            if terminal.is_float_terminal(buf) then
-                labels[buf] = terminal.float_terminal_label()
-                max_width = math.max(max_width, #labels[buf])
-            end
-        end
-    end
-
     return labels, max_width
 end
 

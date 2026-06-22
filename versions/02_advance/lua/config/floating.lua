@@ -4,14 +4,6 @@ local window = require("config.floating.window")
 
 local M = {}
 
-local function hide_float_terminal_if_visible()
-    local ok_terminal, terminal = pcall(require, "config.terminal")
-
-    if ok_terminal then
-        terminal.hide_float_terminal_if_visible()
-    end
-end
-
 local function terminal_job_running(buf)
     local job_id = vim.b[buf].terminal_job_id
 
@@ -143,7 +135,6 @@ function M.open_slot(slot_id)
     local item = state.slot(slot_id)
 
     window.hide_other_slots(slot_id)
-    hide_float_terminal_if_visible()
 
     if state.valid_window(item.win) then
         vim.api.nvim_set_current_win(item.win)
@@ -168,7 +159,6 @@ function M.show_buffer_slot(buf)
     for slot_id, item in pairs(state.slots) do
         if item.buf == buf then
             window.hide_other_slots(slot_id)
-            hide_float_terminal_if_visible()
 
             if state.valid_window(item.win) then
                 vim.api.nvim_set_current_win(item.win)
@@ -191,7 +181,6 @@ function M.show_buffer_slot(buf)
 
     item.buf = buf
     window.hide_other_slots(slot_id)
-    hide_float_terminal_if_visible()
 
     if state.valid_window(item.win) then
         vim.api.nvim_win_set_buf(item.win, buf)
@@ -234,7 +223,6 @@ function M.open_buffer(buf, opts)
     local item = state.slot(slot_id)
 
     window.hide_other_slots(slot_id)
-    hide_float_terminal_if_visible()
 
     if not state.valid_window(item.win) then
         window.open(slot_id, state.valid_buffer(item.buf) and item.buf or buffers.create_home(slot_id))

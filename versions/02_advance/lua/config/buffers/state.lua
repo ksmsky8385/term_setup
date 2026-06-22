@@ -34,24 +34,6 @@ function M.terminal_job_running(buf)
     return type(job_id) == "number" and vim.fn.jobwait({ job_id }, 0)[1] == -1
 end
 
-function M.terminal_kind(buf)
-    local ok_terminal, terminal = pcall(require, "config.terminal")
-
-    if not ok_terminal then
-        return nil
-    end
-
-    if terminal.is_float_terminal(buf) then
-        return "float"
-    end
-
-    if vim.bo[buf].buftype == "terminal" then
-        return "buffer"
-    end
-
-    return nil
-end
-
 function M.movable(buf)
     if not M.valid_listed(buf) then
         return false
@@ -74,7 +56,7 @@ function M.movable(buf)
         return true
     end
 
-    return M.terminal_kind(buf) == "buffer"
+    return buftype == "terminal"
 end
 
 function M.delete_blocker(buf, force)
@@ -132,9 +114,7 @@ function M.sorted_numbers()
         local a_rank
         local b_rank
 
-        if M.terminal_kind(a) == "float" then
-            a_rank = 0
-        elseif ok_floating then
+        if ok_floating then
             local rank = floating.slot_sort_rank(a)
 
             if rank then
@@ -142,9 +122,7 @@ function M.sorted_numbers()
             end
         end
 
-        if M.terminal_kind(b) == "float" then
-            b_rank = 0
-        elseif ok_floating then
+        if ok_floating then
             local rank = floating.slot_sort_rank(b)
 
             if rank then

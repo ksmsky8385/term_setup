@@ -315,7 +315,6 @@ return {
 
                     if
                         config.relative == ""
-                        and filetype ~= "FloatingTerminal"
                         and filetype ~= "FloatingSlot"
                         and filetype ~= "NvimTree"
                         and filetype ~= "notify"

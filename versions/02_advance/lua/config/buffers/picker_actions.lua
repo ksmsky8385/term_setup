@@ -48,13 +48,6 @@ function M.open_selected(prompt_bufnr, operations)
 
     close_picker(prompt_bufnr)
 
-    local ok_terminal, terminal = pcall(require, "config.terminal")
-
-    if ok_terminal and terminal.is_float_terminal(buf) then
-        terminal.show_float_terminal(buf)
-        return
-    end
-
     local ok_floating, floating = pcall(require, "config.floating")
 
     if ok_floating and floating.show_buffer_slot(buf) then
