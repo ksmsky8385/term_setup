@@ -459,6 +459,20 @@ return {
                 )
 
                 vim.keymap.set(
+                    { "n", "x" },
+                    "d",
+                    api.fs.trash,
+                    opts("Move to trash")
+                )
+
+                vim.keymap.set(
+                    { "n", "x" },
+                    "D",
+                    api.fs.remove,
+                    opts("Delete permanently")
+                )
+
+                vim.keymap.set(
                     "n",
                     "<Esc>",
                     close_preview_or_restore_root,
@@ -490,6 +504,10 @@ return {
 
             filters = {
                 dotfiles = false,
+            },
+
+            trash = {
+                cmd = "gio trash",
             },
 
             actions = {
