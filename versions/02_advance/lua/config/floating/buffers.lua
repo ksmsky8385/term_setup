@@ -89,6 +89,10 @@ function M.safe_delete_old(buf, force)
         return
     end
 
+    if vim.bo[buf].buftype == "" and vim.api.nvim_buf_get_name(buf) ~= "" then
+        return
+    end
+
     local filetype = vim.bo[buf].filetype
 
     if

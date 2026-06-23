@@ -49,6 +49,12 @@ local function can_delete_unique_window_buffer(buf, force)
     return state.delete_blocker(buf, force) == nil
 end
 
+local function is_named_file_buffer(buf)
+    return vim.api.nvim_buf_is_valid(buf)
+        and vim.bo[buf].buftype == ""
+        and vim.api.nvim_buf_get_name(buf) ~= ""
+end
+
 local function move_between_windows(buf, source_win, target_win)
     if not state.movable(buf) then
         vim.notify("Buffer can't be moved", vim.log.levels.WARN)
@@ -154,14 +160,18 @@ function M.open_buffer_in_window(buf, target_win, opts)
     end
 
     local old_visible_count = visibility.all_visible_count(old_buf)
+    local keep_old = opts.delete_old_if_safe
+        and old_visible_count == 1
+        and is_named_file_buffer(old_buf)
     local delete_old = opts.delete_old_if_safe
         and old_visible_count == 1
         and state.movable(old_buf)
+        and not keep_old
 
-    if delete_old then
+    if keep_old or delete_old then
         local can_delete = can_delete_unique_window_buffer(old_buf, opts.force)
 
-        if not can_delete then
+        if delete_old and not can_delete then
             local blocker = state.delete_blocker(old_buf, opts.force)
 
             if blocker then
@@ -171,7 +181,7 @@ function M.open_buffer_in_window(buf, target_win, opts)
 
         set_window_buffer(target_win, buf)
 
-        if can_delete then
+        if delete_old and can_delete then
             local ok, err = state.delete(old_buf, opts.force)
 
             if not ok then
