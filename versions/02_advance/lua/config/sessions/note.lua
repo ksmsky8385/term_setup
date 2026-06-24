@@ -8,6 +8,10 @@ local write_metadata = metadata_store.write
 local configured_slot_id = session_slots.configured
 local known_slot_id = session_slots.known
 
+local function confirmed(answer)
+    return answer == "" or answer == "y" or answer == "Y"
+end
+
 local function valid_slot(slot)
     slot = known_slot_id(slot) or configured_slot_id(slot)
 
@@ -49,9 +53,9 @@ function M.edit_field(slot, field, label, opts)
         end
 
         vim.ui.input({
-            prompt = "Update session " .. slot .. " " .. label .. "? Type y to confirm: ",
+            prompt = "Update session " .. slot .. " " .. label .. "? Press Enter or type y to confirm: ",
         }, function(answer)
-            if answer ~= "y" and answer ~= "Y" then
+            if not confirmed(answer) then
                 if opts.on_cancel then
                     opts.on_cancel()
                 end
@@ -193,9 +197,9 @@ function M.open_editor(slot, opts)
         end
 
         vim.ui.input({
-            prompt = "Update session " .. slot .. " note? Type y to confirm: ",
+            prompt = "Update session " .. slot .. " note? Press Enter or type y to confirm: ",
         }, function(answer)
-            if answer ~= "y" and answer ~= "Y" then
+            if not confirmed(answer) then
                 return
             end
 

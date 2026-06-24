@@ -14,6 +14,10 @@ local current_tree_state = session_restore.current_tree_state
 local read_metadata = metadata_store.read
 local write_metadata = metadata_store.write
 
+local function confirmed(answer)
+    return answer == "" or answer == "y" or answer == "Y"
+end
+
 function M.exists(slot)
     return vim.fn.filereadable(session_paths.metadata_path(slot)) == 1
 end
@@ -75,9 +79,9 @@ function M.save(slot, force, opts)
 
     if M.exists(slot) and not force then
         vim.ui.input({
-            prompt = "Overwrite session " .. slot .. "? Type y to confirm: ",
+            prompt = "Overwrite session " .. slot .. "? Press Enter or type y to confirm: ",
         }, function(answer)
-            if answer == "y" or answer == "Y" then
+            if confirmed(answer) then
                 M.save(slot, true, opts)
             elseif opts.on_cancel then
                 opts.on_cancel()
@@ -220,9 +224,9 @@ function M.delete(slot, force, opts)
 
     if not force then
         vim.ui.input({
-            prompt = "Delete session " .. slot .. "? Type y to confirm: ",
+            prompt = "Delete session " .. slot .. "? Press Enter or type y to confirm: ",
         }, function(answer)
-            if answer == "y" or answer == "Y" then
+            if confirmed(answer) then
                 M.delete(slot, true, opts)
             elseif opts.on_cancel then
                 opts.on_cancel()

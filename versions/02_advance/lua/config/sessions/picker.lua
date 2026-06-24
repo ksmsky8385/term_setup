@@ -96,6 +96,10 @@ function M.pick(opts, operations)
                     buf = nil,
                     win = nil,
                 }
+                local move_state = nil
+                local confirm_move_target
+                local cancel_move_target
+                local move_to_target
 
                 local entry_maker = function(entry)
                     return telescope_picker.entry_maker(entry)
@@ -359,6 +363,11 @@ function M.pick(opts, operations)
                 end
 
                 telescope.actions.select_default:replace(function()
+                    if move_state and confirm_move_target then
+                        confirm_move_target()
+                        return
+                    end
+
                     local slot = selected_slot()
 
                     close_picker()
@@ -404,24 +413,65 @@ function M.pick(opts, operations)
                         return
                     end
 
-                    vim.ui.input({
-                        prompt = "Move session " .. slot .. " to configured slot: ",
-                    }, function(target)
-                        if target == nil or target == "" then
-                            restore_selection(slot, row)
-                            return
-                        end
+                    if move_state then
+                        confirm_move_target()
+                        return
+                    end
 
-                        local ok = operations.move(slot, target, {
-                            on_update = function(next_slot)
-                                refresh_picker(next_slot)
-                            end,
-                        })
+                    close_floating_preview()
+                    move_state = {
+                        slot = slot,
+                        row = row,
+                    }
+                    vim.notify(
+                        "Select target slot for session "
+                            .. slot
+                            .. ", then press Enter, m, or a slot number"
+                    )
+                end
 
-                        if not ok then
-                            restore_selection(slot, row)
-                        end
-                    end)
+                move_to_target = function(target_slot)
+                    if not move_state then
+                        return
+                    end
+
+                    local source_slot = move_state.slot
+                    local source_row = move_state.row
+
+                    move_state = nil
+
+                    if target_slot == nil then
+                        restore_selection(source_slot, source_row)
+                        return
+                    end
+
+                    local ok = operations.move(source_slot, target_slot, {
+                        on_update = function(next_slot)
+                            refresh_picker(next_slot)
+                        end,
+                    })
+
+                    if not ok then
+                        restore_selection(source_slot, source_row)
+                    end
+                end
+
+                confirm_move_target = function()
+                    move_to_target(selected_slot())
+                end
+
+                cancel_move_target = function()
+                    if not move_state then
+                        return false
+                    end
+
+                    local source_slot = move_state.slot
+                    local source_row = move_state.row
+
+                    move_state = nil
+                    restore_selection(source_slot, source_row)
+                    vim.notify("Session move cancelled.", vim.log.levels.INFO)
+                    return true
                 end
 
                 local note_selected = function()
@@ -499,6 +549,15 @@ function M.pick(opts, operations)
                 map("n", "n", name_selected)
                 map("n", "e", note_selected)
                 map("n", "d", delete_selected)
+                for _, slot in ipairs(session_slots.configured_ids()) do
+                    if #slot == 1 then
+                        map("n", slot, function()
+                            if move_state then
+                                move_to_target(slot)
+                            end
+                        end)
+                    end
+                end
                 map("n", "<Tab>", toggle_floating_preview)
                 map("n", "<C-u>", function()
                     telescope.action_set.scroll_previewer(prompt_bufnr, -1)
@@ -514,6 +573,10 @@ function M.pick(opts, operations)
                 end)
 
                 local close_preview_or_picker = function()
+                    if cancel_move_target and cancel_move_target() then
+                        return
+                    end
+
                     if
                         floating_preview.win
                         and vim.api.nvim_win_is_valid(floating_preview.win)
