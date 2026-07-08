@@ -93,6 +93,7 @@ function M.open()
         "    Python args        F5 후 Args 입력창에 실행 인자 입력",
         "    Python venv        VIRTUAL_ENV, CONDA_PREFIX, .venv/venv/env, pyvenv.cfg 순서로 탐색",
         "    C/C++/Rust args    F5 후 Executable, Args 입력창에 입력",
+        "    C debug build      cc -g -gdwarf-4 -O0 file.c -o a.out",
         "    Adapter 예시       codelldb(C/C++/Rust), debugpy(Python), delve(Go)",
         "    동작 조건          언어별 debug adapter 설치 및 프로젝트 실행 설정 필요",
         "",
