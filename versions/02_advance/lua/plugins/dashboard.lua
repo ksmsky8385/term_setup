@@ -81,7 +81,7 @@ return {
                 if
                     vim.api.nvim_buf_is_valid(buf)
                     and vim.bo[buf].modified
-                    and vim.bo[buf].buftype ~= "terminal"
+                    and vim.bo[buf].buftype == ""
                 then
                     local name = vim.api.nvim_buf_get_name(buf)
 

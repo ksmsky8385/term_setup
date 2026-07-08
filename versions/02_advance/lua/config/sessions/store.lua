@@ -1,4 +1,5 @@
 local metadata_store = require("config.sessions.metadata")
+local session_breakpoints = require("config.sessions.breakpoints")
 local session_buffers = require("config.sessions.buffers")
 local session_paths = require("config.sessions.paths")
 local session_layout = require("config.sessions.layout")
@@ -65,6 +66,34 @@ local function hide_floating_slots()
     end
 end
 
+local function stop_debugger_for_session_save()
+    local stopped = false
+    local ok_dap, dap = pcall(require, "dap")
+
+    if ok_dap then
+        local session = dap.session()
+
+        if session then
+            stopped = true
+            pcall(dap.terminate)
+        end
+
+        if dap.repl and type(dap.repl.close) == "function" then
+            pcall(dap.repl.close)
+        end
+    end
+
+    local ok_dapui, dapui = pcall(require, "dapui")
+
+    if ok_dapui then
+        pcall(dapui.close)
+    end
+
+    if stopped then
+        vim.notify("Stopped debugger before saving session.", vim.log.levels.INFO)
+    end
+end
+
 function M.save(slot, force, opts)
     opts = opts or {}
     slot = session_slots.configured(slot)
@@ -97,6 +126,7 @@ function M.save(slot, force, opts)
 
     vim.fn.mkdir(session_paths.dir, "p")
 
+    stop_debugger_for_session_save()
     hide_floating_slots()
 
     local ok, layout = pcall(session_layout.snapshot)
@@ -118,6 +148,7 @@ function M.save(slot, force, opts)
     metadata.floating_slots = hidden_floating_slots()
     metadata.tree = current_tree_state()
     metadata.layout = layout
+    metadata.breakpoints = session_breakpoints.snapshot()
     metadata.saved_at = os.date("%Y-%m-%d %H:%M:%S")
 
     write_metadata(slot, metadata)

@@ -6,6 +6,7 @@ return {
 
     config = function()
         local buffers = require("config.buffers")
+        local swap = require("config.swap")
         local window_picker = require("config.window_picker")
         local api = require("nvim-tree.api")
         local preview_win
@@ -272,10 +273,14 @@ return {
                 return
             end
 
-            local buf = vim.fn.bufadd(node.absolute_path)
+            local buf = swap.load_buffer(node.absolute_path, {
+                win = target_win,
+            })
 
-            vim.fn.bufload(buf)
-            vim.bo[buf].buflisted = true
+            if not buf then
+                return
+            end
+
             local opened = buffers.open_buffer_in_window(buf, target_win, {
                 delete_old_if_safe = true,
             })

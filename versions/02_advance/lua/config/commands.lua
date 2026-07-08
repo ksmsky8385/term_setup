@@ -30,6 +30,12 @@ end, {
     desc = "Open LSP settings",
 })
 
+vim.api.nvim_create_user_command("SettingsDebugger", function()
+    open_settings("debugger")
+end, {
+    desc = "Open debugger settings",
+})
+
 vim.api.nvim_create_user_command("SettingsSnippets", function()
     open_settings("snippets")
 end, {
@@ -52,6 +58,12 @@ vim.api.nvim_create_user_command("LSPSettings", function()
     open_settings("lsp")
 end, {
     desc = "Alias for SettingsLSP",
+})
+
+vim.api.nvim_create_user_command("DAPSettings", function()
+    open_settings("debugger")
+end, {
+    desc = "Alias for SettingsDebugger",
 })
 
 vim.api.nvim_create_user_command("SnippetSettings", function()

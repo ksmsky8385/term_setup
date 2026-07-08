@@ -1,5 +1,6 @@
 local M = {}
 
+local session_breakpoints = require("config.sessions.breakpoints")
 local session_layout = require("config.sessions.layout")
 local empty_buffers = require("config.empty_buffers")
 
@@ -179,11 +180,13 @@ function M.after_load(metadata)
     clear_missing_file_buffers()
 
     if session_layout.restore(metadata.layout) then
+        session_breakpoints.restore(metadata.breakpoints)
         restore_floating_slots(metadata.floating_slots)
         empty_buffers.cleanup()
         return
     end
 
+    session_breakpoints.restore(metadata.breakpoints)
     restore_terminals(metadata.terminals)
     restore_floating_slots(metadata.floating_slots)
     restore_tree(metadata.tree)

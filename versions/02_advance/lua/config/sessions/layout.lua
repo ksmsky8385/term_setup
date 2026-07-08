@@ -1,5 +1,6 @@
 local M = {}
 local empty_buffers = require("config.empty_buffers")
+local swap = require("config.swap")
 
 local VERSION = 1
 
@@ -79,6 +80,35 @@ local function dashboard_descriptor(win)
     return descriptor
 end
 
+local function is_dap_buffer(buf)
+    if not valid_buffer(buf) then
+        return false
+    end
+
+    local filetype = vim.bo[buf].filetype
+    local buftype = vim.bo[buf].buftype
+    local name = vim.api.nvim_buf_get_name(buf)
+
+    local lower_name = name:lower()
+
+    return filetype == "dap-repl"
+        or filetype:match("^dapui_") ~= nil
+        or filetype:match("^dap%-") ~= nil
+        or filetype == "dapui_breakpoints"
+        or filetype == "dapui_console"
+        or filetype == "dapui_scopes"
+        or filetype == "dapui_stacks"
+        or filetype == "dapui_watches"
+        or (
+            buftype ~= ""
+            and (
+                lower_name:match("%[dap%-[^%]]+%]$") ~= nil
+                or lower_name:match("dap%-repl") ~= nil
+                or lower_name:match("dapui") ~= nil
+            )
+        )
+end
+
 buffer_descriptor = function(buf, win)
     if not valid_buffer(buf) then
         return {
@@ -89,6 +119,12 @@ buffer_descriptor = function(buf, win)
     local filetype = vim.bo[buf].filetype
     local buftype = vim.bo[buf].buftype
     local name = vim.api.nvim_buf_get_name(buf)
+
+    if is_dap_buffer(buf) then
+        return {
+            kind = "empty",
+        }
+    end
 
     if vim.b[buf].config_about_neovim then
         return dashboard_descriptor(win)
@@ -336,10 +372,15 @@ local function restore_file(win, descriptor)
         return
     end
 
-    local buf = vim.fn.bufadd(descriptor.path)
+    local buf = swap.load_buffer(descriptor.path, {
+        win = win,
+    })
 
-    vim.fn.bufload(buf)
-    vim.bo[buf].buflisted = true
+    if not valid_buffer(buf) then
+        vim.api.nvim_win_set_buf(win, create_empty_buffer())
+        return
+    end
+
     vim.api.nvim_win_set_buf(win, buf)
 
     if type(descriptor.cursor) == "table" then
@@ -416,9 +457,7 @@ local function restore_dashboard(win, descriptor)
         local path = descriptor.previous.path
 
         if type(path) == "string" and path ~= "" then
-            previous_buf = vim.fn.bufadd(path)
-            vim.fn.bufload(previous_buf)
-            vim.bo[previous_buf].buflisted = true
+            previous_buf = swap.load_buffer(path)
         end
     end
 

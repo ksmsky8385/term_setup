@@ -64,6 +64,12 @@ local function open_main()
             end,
         },
         {
+            label = "Debugger settings",
+            action = function()
+                M.open("debugger")
+            end,
+        },
+        {
             label = "Snippet settings",
             action = function()
                 M.open("snippets")
@@ -315,6 +321,55 @@ local function open_lsp()
     })
 end
 
+local function open_debugger()
+    local debugger = require("config.debugger")
+
+    picker("Settings > Debugger", {
+        {
+            label = "< Back",
+            action = open_main,
+        },
+        {
+            label = "Args prompt: "
+                .. (debugger.prompt_args_enabled() and "enabled" or "disabled"),
+            action = function()
+                debugger.toggle_prompt_args()
+                M.open("debugger")
+            end,
+        },
+        {
+            label = "Adapter list",
+            action = function()
+                vim.cmd("DAPMyList")
+            end,
+        },
+        {
+            label = "Adapter install",
+            action = function()
+                vim.cmd("DAPMyInstall")
+            end,
+        },
+        {
+            label = "Adapter remove",
+            action = function()
+                vim.cmd("DAPMyUninstall")
+            end,
+        },
+        {
+            label = "Update registry",
+            action = function()
+                vim.cmd("DAPMyUpdate")
+            end,
+        },
+        {
+            label = "Open Mason",
+            action = function()
+                vim.cmd("Mason")
+            end,
+        },
+    })
+end
+
 local function open_snippets()
     local completion = require("config.completion")
     local state = completion.state
@@ -365,6 +420,8 @@ function M.open(menu)
         open_treesitter()
     elseif menu == "lsp" then
         open_lsp()
+    elseif menu == "debugger" then
+        open_debugger()
     elseif menu == "snippets" then
         open_snippets()
     else

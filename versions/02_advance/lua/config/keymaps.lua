@@ -416,6 +416,14 @@ end, {
     desc = "Toggle floating slot ~",
 })
 
+vim.keymap.set("n", "<leader>~", function()
+    floating.toggle("`")
+end, {
+    noremap = true,
+    silent = true,
+    desc = "Toggle floating slot ~",
+})
+
 for slot = 0, 9 do
     vim.keymap.set("n", "<leader>" .. slot, function()
         floating.toggle(slot)
