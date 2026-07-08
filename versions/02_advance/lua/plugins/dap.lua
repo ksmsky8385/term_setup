@@ -303,7 +303,6 @@ return {
                     cwd = "${workspaceFolder}",
                     console = "integratedTerminal",
                     python = debugger.python_executable,
-                    pythonPath = debugger.python_executable,
                     env = debugger.python_environment,
                     args = debugger.prompt_args,
                 },
