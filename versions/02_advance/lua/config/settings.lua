@@ -356,6 +356,12 @@ local function open_debugger()
             end,
         },
         {
+            label = "Show runtime path",
+            action = function()
+                vim.cmd("DAPPath")
+            end,
+        },
+        {
             label = "Update registry",
             action = function()
                 vim.cmd("DAPMyUpdate")

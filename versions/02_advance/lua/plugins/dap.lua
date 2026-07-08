@@ -276,6 +276,16 @@ return {
                 vim.cmd("MasonUpdate")
             end, {})
 
+            vim.api.nvim_create_user_command("DAPPath", function()
+                local label, path = debugger.runtime_executable()
+                vim.notify("DAP " .. label .. ": " .. path)
+            end, {})
+
+            vim.api.nvim_create_user_command("DAPPythonPath", function()
+                local _, path = debugger.runtime_executable("python")
+                vim.notify("DAP Python: " .. path)
+            end, {})
+
             local function prompt_executable()
                 return vim.fn.input(
                     "Executable: ",
@@ -292,6 +302,9 @@ return {
                     program = "${file}",
                     cwd = "${workspaceFolder}",
                     console = "integratedTerminal",
+                    python = debugger.python_executable,
+                    pythonPath = debugger.python_executable,
+                    env = debugger.python_environment,
                     args = debugger.prompt_args,
                 },
             }
@@ -374,6 +387,9 @@ return {
             map("n", "<leader>dL", function()
                 dap.set_breakpoint(nil, nil, vim.fn.input("Log point message: "))
             end, "DAP logpoint")
+            map("n", "<leader>dp", function()
+                vim.cmd("DAPPath")
+            end, "DAP show runtime path")
             map("n", "<leader>dr", dap.repl.open, "DAP open REPL")
             map("n", "<leader>dq", dap.terminate, "DAP terminate")
         end,
