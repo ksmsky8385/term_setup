@@ -1,6 +1,7 @@
 local M = {}
 local telescope_picker = require("config.picker")
 local empty_buffers = require("config.empty_buffers")
+local window_picker = require("config.window_picker")
 
 local function hl(name)
     local ok, value = pcall(vim.api.nvim_get_hl, 0, {
@@ -61,7 +62,35 @@ local function tab_windows(tabnr)
         return {}
     end
 
-    return vim.api.nvim_tabpage_list_wins(tabpage)
+    local windows = vim.tbl_filter(function(win)
+        return vim.api.nvim_win_is_valid(win)
+            and vim.api.nvim_win_get_config(win).relative == ""
+    end, vim.api.nvim_tabpage_list_wins(tabpage))
+
+    table.sort(windows, function(left, right)
+        local left_order = window_picker.existing_window_order(left)
+        local right_order = window_picker.existing_window_order(right)
+
+        if left_order and right_order then
+            return left_order < right_order
+        end
+
+        if left_order then
+            return true
+        end
+
+        if right_order then
+            return false
+        end
+
+        return left < right
+    end)
+
+    for _, win in ipairs(windows) do
+        window_picker.window_order(win)
+    end
+
+    return windows
 end
 
 local function tab_buffer_name(tabnr)
@@ -70,7 +99,7 @@ local function tab_buffer_name(tabnr)
             local buf = vim.api.nvim_win_get_buf(win)
             local filetype = vim.bo[buf].filetype
 
-            if filetype ~= "NvimTree" and filetype ~= "alpha" then
+            if filetype ~= "NvimTree" and filetype ~= "alpha" and filetype ~= "notify" then
                 local name = vim.api.nvim_buf_get_name(buf)
 
                 if name ~= "" then
