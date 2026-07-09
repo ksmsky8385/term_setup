@@ -29,11 +29,11 @@ local function ensure_dir(path, label)
 end
 
 local function temp_dir()
-    local path = vim.env.NVIM_TOOL_TMPDIR or vim.env.TMPDIR or "/tmp"
+    local path = vim.env.NVIM_TOOL_TMPDIR or (vim.fn.stdpath("data") .. "/tool-tmp")
     path = vim.fn.fnamemodify(vim.fn.expand(path), ":p"):gsub("/+$", "")
 
     if path == "" then
-        path = "/"
+        path = vim.fn.expand("~/.local/share/nvim/tool-tmp")
     end
 
     if ensure_dir(path, "tool temp") then
