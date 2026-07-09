@@ -58,8 +58,6 @@ ask_yes_no() {
 }
 
 ensure_fonts() {
-    local font_installed=false
-
     echo
     echo "폰트 설정을 확인합니다."
 
@@ -70,7 +68,6 @@ ensure_fonts() {
     elif [ -d "$SOURCE_D2CODING_DIR" ]; then
         echo "D2Coding Nerd Font를 설치합니다."
         cp -R "$SOURCE_D2CODING_DIR" "$LOCAL_D2CODING_DIR"
-        font_installed=true
     else
         echo "Warning: D2Coding Nerd Font 디렉토리가 없습니다."
         echo "Expected: $SOURCE_D2CODING_DIR"
@@ -81,19 +78,16 @@ ensure_fonts() {
     elif [ -f "$SOURCE_D2CODING_TTC" ]; then
         echo "D2Coding TTC 폰트를 설치합니다."
         cp "$SOURCE_D2CODING_TTC" "$LOCAL_D2CODING_TTC"
-        font_installed=true
     else
         echo "Warning: D2Coding TTC 폰트 파일이 없습니다."
         echo "Expected: $SOURCE_D2CODING_TTC"
     fi
 
-    if [ "$font_installed" = true ]; then
-        if command -v fc-cache >/dev/null 2>&1; then
-            echo "폰트 캐시를 갱신합니다."
-            fc-cache -f "$LOCAL_FONT_DIR" >/dev/null 2>&1 || true
-        else
-            echo "Warning: fc-cache 명령어가 없어 폰트 캐시 갱신을 건너뜁니다."
-        fi
+    if command -v fc-cache >/dev/null 2>&1; then
+        echo "폰트 캐시를 갱신합니다."
+        fc-cache -f "$LOCAL_FONT_DIR" >/dev/null 2>&1 || true
+    else
+        echo "Warning: fc-cache 명령어가 없어 폰트 캐시 갱신을 건너뜁니다."
     fi
 }
 
