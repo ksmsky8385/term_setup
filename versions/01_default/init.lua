@@ -119,7 +119,7 @@ require("lazy").setup({
         lazy = false,
         priority = 1000,
         config = function()
-            vim.cmd.colorscheme("default")
+            vim.cmd.colorscheme("vscode")
         end,
     },
 
