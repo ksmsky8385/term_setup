@@ -196,6 +196,26 @@ remove_all_agents() {
     remove_codex
 }
 
+show_agent_commands() {
+    echo "에이전트별 설치 및 실행 명령"
+    echo
+    echo "01. Antigravity CLI"
+    echo "    터미널에서 Google Antigravity 에이전트를 사용하는 CLI입니다."
+    echo "    설치: curl -fsSL https://antigravity.google/cli/install.sh | bash"
+    echo "    실행: agy"
+    echo
+    echo "02. Codex CLI"
+    echo "    OpenAI Codex 에이전트로 코드 탐색, 수정, 실행을 돕습니다."
+    echo "    설치: curl -fsSL https://chatgpt.com/codex/install.sh | sh"
+    echo "    실행: codex"
+    echo
+    echo "03. GitHub Copilot CLI"
+    echo "    GitHub Copilot을 터미널에서 사용하는 코딩 에이전트입니다."
+    echo "    설치: npm install -g @github/copilot"
+    echo "    실행: copilot (첫 실행 후 /login으로 GitHub 인증)"
+    echo
+}
+
 delete_menu() {
     echo "CLI Agent 삭제 메뉴"
     echo
@@ -244,6 +264,8 @@ main_menu() {
 
     echo "CLI Agent 설정 스크립트"
     echo
+
+    show_agent_commands
 
     echo "00. CLI 에이전트 삭제 메뉴"
     echo "01. Antigravity CLI 설치"

@@ -71,14 +71,59 @@ Agent 설정에서 설치되는 항목:
 - **Codex CLI** : `~/.local/bin/codex` 경로에 설치
 - **GitHub Copilot CLI** : `$HOME/.nvm`의 사용자 로컬 npm을 통해 전역 설치
 
-## CLI 에이전트 설정 및 Claude Code 안내
+## CLI 에이전트
 
 `launch.sh` 메뉴의 **3. agent 설정** 을 선택하면 먼저 사용자 로컬 Node.js/npm 환경을 확인합니다. npm이 없거나 시스템 전역 npm을 사용 중이면 `nvm`과 Node.js LTS를 `$HOME/.nvm` 아래에 설치한 뒤 에이전트 메뉴를 표시합니다.
 
-이후 다음 AI 에이전트를 설치하거나 관리할 수 있습니다:
-- **Antigravity CLI** : 터미널 환경에서 Google Gemini 모델 기반으로 작동하는 강력한 AI 코딩 어시스턴트입니다.
-- **Codex CLI** : OpenAI 모델 기반의 AI 코딩/쉘 어시스턴트입니다.
-- **GitHub Copilot CLI** : GitHub Copilot을 터미널에서 사용할 수 있는 CLI 에이전트입니다. 설치에는 Node.js 22 이상과 npm이 필요합니다.
+에이전트 메뉴에는 각 도구의 설치 명령과 실행 명령도 표시됩니다.
+
+### Antigravity CLI
+
+터미널에서 Google Antigravity 에이전트를 실행하는 CLI입니다. 코드베이스를 자연어로 탐색하고 수정하는 작업에 사용할 수 있습니다.
+
+설치:
+
+```sh
+curl -fsSL https://antigravity.google/cli/install.sh | bash
+```
+
+실행:
+
+```sh
+agy
+```
+
+### Codex CLI
+
+OpenAI의 터미널 기반 코딩 에이전트입니다. 코드 설명, 파일 수정, 명령 실행과 같은 개발 작업을 지원합니다.
+
+설치:
+
+```sh
+curl -fsSL https://chatgpt.com/codex/install.sh | sh
+```
+
+실행:
+
+```sh
+codex
+```
+
+### GitHub Copilot CLI
+
+GitHub Copilot을 터미널에서 사용하는 코딩 에이전트입니다. 설치에는 Node.js 22 이상과 npm이 필요하며, 이 패키지의 에이전트 메뉴는 사용자 로컬 npm 환경을 먼저 준비합니다.
+
+설치:
+
+```sh
+npm install -g @github/copilot
+```
+
+실행 후 처음 사용할 때 `/login`을 입력해 GitHub 계정을 인증합니다.
+
+```sh
+copilot
+```
 
 ### GitHub Copilot 학생팩 안내
 
