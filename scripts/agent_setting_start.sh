@@ -1,6 +1,91 @@
 #!/usr/bin/env bash
 
 set -e
+set -o pipefail
+
+NVM_VERSION="v0.40.4"
+NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
+
+load_nvm() {
+    export NVM_DIR
+
+    if [ ! -s "$NVM_DIR/nvm.sh" ]; then
+        return 1
+    fi
+
+    # shellcheck disable=SC1090
+    . "$NVM_DIR/nvm.sh"
+}
+
+install_nvm() {
+    local installer_url
+    local installer
+
+    installer_url="https://raw.githubusercontent.com/nvm-sh/nvm/${NVM_VERSION}/install.sh"
+    installer="$(mktemp)"
+
+    echo "사용자 로컬 Node.js/npm 환경을 설치합니다."
+
+    if ! curl -fsSL "$installer_url" -o "$installer"; then
+        rm -f "$installer"
+        echo "Error: nvm 설치 스크립트를 다운로드하지 못했습니다."
+        return 1
+    fi
+
+    if ! bash "$installer"; then
+        rm -f "$installer"
+        echo "Error: nvm 설치에 실패했습니다."
+        return 1
+    fi
+
+    rm -f "$installer"
+}
+
+ensure_user_local_npm() {
+    local npm_prefix
+    local node_major
+
+    if command -v npm >/dev/null 2>&1 && command -v node >/dev/null 2>&1; then
+        npm_prefix="$(npm prefix -g 2>/dev/null || true)"
+        node_major="$(node --version | sed -E 's/^v([0-9]+).*/\1/')"
+
+        if [ -n "$npm_prefix" ] && [ -n "$node_major" ] \
+            && [ "$node_major" -ge 22 ] \
+            && case "$npm_prefix" in "$HOME"/*) true ;; *) false ;; esac; then
+            echo "사용자 로컬 npm이 이미 준비되어 있습니다: $npm_prefix"
+            return 0
+        fi
+    fi
+
+    if ! load_nvm; then
+        install_nvm
+        load_nvm || {
+            echo "Error: 설치한 nvm을 현재 쉘에 불러오지 못했습니다."
+            return 1
+        }
+    fi
+
+    echo "사용자 로컬 Node.js LTS/npm을 준비합니다."
+    nvm install --lts
+    nvm alias default 'lts/*'
+    nvm use default
+
+    if ! command -v npm >/dev/null 2>&1 || ! command -v node >/dev/null 2>&1; then
+        echo "Error: 사용자 로컬 npm을 찾지 못했습니다."
+        return 1
+    fi
+
+    npm_prefix="$(npm prefix -g 2>/dev/null || true)"
+    case "$npm_prefix" in
+        "$HOME"/*)
+            echo "사용자 로컬 npm 준비 완료: $npm_prefix"
+            ;;
+        *)
+            echo "Error: npm 전역 설치 경로가 사용자 홈 디렉토리가 아닙니다: $npm_prefix"
+            return 1
+            ;;
+    esac
+}
 
 confirm() {
     local message="$1"
@@ -34,6 +119,14 @@ install_codex() {
     echo "Codex CLI 설치"
     curl -fsSL https://chatgpt.com/codex/install.sh | sh
     codex --version || true
+}
+
+install_copilot() {
+    confirm "GitHub Copilot CLI 설치를 진행하겠습니까?" || return 0
+
+    echo "GitHub Copilot CLI 설치"
+    npm install -g @github/copilot
+    copilot --version || true
 }
 
 remove_antigravity_cache() {
@@ -147,13 +240,16 @@ delete_menu() {
 }
 
 main_menu() {
+    ensure_user_local_npm
+
     echo "CLI Agent 설정 스크립트"
     echo
 
     echo "00. CLI 에이전트 삭제 메뉴"
     echo "01. Antigravity CLI 설치"
     echo "02. Codex CLI 설치"
-    echo "03. 전체 설치 (Antigravity & Codex)"
+    echo "03. GitHub Copilot CLI 설치"
+    echo "04. 전체 설치 (Antigravity & Codex & GitHub Copilot)"
     echo
     printf "> "
     read -r choice
@@ -169,8 +265,12 @@ main_menu() {
             install_codex
             ;;
         3 | 03)
+            install_copilot
+            ;;
+        4 | 04)
             install_antigravity
             install_codex
+            install_copilot
             ;;
         *)
             echo "Error: 잘못된 선택입니다."

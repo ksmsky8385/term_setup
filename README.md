@@ -50,7 +50,7 @@ zsh 및 nvim의 일부 문자사용을 위해 D2coding Nerd Font 계열도 함�
   - 선택한 버전을 `~/.config/nvim`으로 복사합니다.
 
 - `scripts/agent_setting_start.sh`
-  - CLI 에이전트(Antigravity, Codex)의 설치/삭제 및 캐시 삭제 기능 등을 제공합니다.
+  - CLI 에이전트(Antigravity, Codex, GitHub Copilot)의 설치/삭제 및 캐시 삭제 기능 등을 제공합니다.
 
 ## 설치 대상
 
@@ -69,12 +69,24 @@ Neovim 설정은 `versions/` 아래의 설정 폴더를 선택해 설치합니�
 Agent 설정에서 설치되는 항목:
 - **Antigravity CLI** : `~/.local/bin/agy` 경로에 설치
 - **Codex CLI** : `~/.local/bin/codex` 경로에 설치
+- **GitHub Copilot CLI** : `$HOME/.nvm`의 사용자 로컬 npm을 통해 전역 설치
 
 ## CLI 에이전트 설정 및 Claude Code 안내
 
-`launch.sh` 메뉴의 **3. agent 설정** 을 통해 다음 AI 에이전트를 설치하거나 관리할 수 있습니다:
+`launch.sh` 메뉴의 **3. agent 설정** 을 선택하면 먼저 사용자 로컬 Node.js/npm 환경을 확인합니다. npm이 없거나 시스템 전역 npm을 사용 중이면 `nvm`과 Node.js LTS를 `$HOME/.nvm` 아래에 설치한 뒤 에이전트 메뉴를 표시합니다.
+
+이후 다음 AI 에이전트를 설치하거나 관리할 수 있습니다:
 - **Antigravity CLI** : 터미널 환경에서 Google Gemini 모델 기반으로 작동하는 강력한 AI 코딩 어시스턴트입니다.
 - **Codex CLI** : OpenAI 모델 기반의 AI 코딩/쉘 어시스턴트입니다.
+- **GitHub Copilot CLI** : GitHub Copilot을 터미널에서 사용할 수 있는 CLI 에이전트입니다. 설치에는 Node.js 22 이상과 npm이 필요합니다.
+
+### GitHub Copilot 학생팩 안내
+
+42 교육생은 [42 GitHub 포털](https://github-portal.42.fr/login)에서 42 교육생 인증을 완료한 뒤 GitHub 계정을 연동하면 GitHub Student Developer Pack을 사용할 수 있습니다. 학생팩이 적용된 GitHub 계정으로 GitHub Copilot을 이용할 수 있으며, 먼저 아래 명령어로 CLI를 설치하세요.
+
+```sh
+npm install -g @github/copilot
+```
 
 ### Claude Code 안내
 
@@ -95,7 +107,7 @@ NeoVim의 `versions/02_advance`처럼 Mason/LSP 플러그인을 사용하는 설
 42 클러스터처럼 sudo 권한 없이 사용자 홈 디렉토리에 설치해야 하는 환경에서는 `nvm`으로 Node.js를 설치하는 방식을 권장합니다.
 
 ```sh
-curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.5/install.sh | bash
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.4/install.sh | bash
 ```
 
 설치 후 현재 쉘에 바로 적용합니다.
