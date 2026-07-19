@@ -15,19 +15,19 @@ sudo 권한 없이 사용자 홈 디렉토리 아래에 설치되는 구성을 �
 1. zsh 설정
 2. nvim 설정
 3. agent 설정
-4. 전체 설정
-5. 나가기
+4. 폰트 설정
+5. 전체 설정
+6. 나가기
 ```
 
 ## 터미널 폰트 권장 설정
 
-터미널 기본 폰트는 `D2Coding-Ver1.3.2-20180524-all.ttc`의 `D2Coding` 사용을 권장합니다. `launch.sh`에서 zsh 또는 nvim 설정을 선택하면 이 폰트 파일을 `~/.local/share/fonts/`로 복사하고 폰트 캐시를 갱신합니다.
+터미널 기본 폰트는 `D2Coding-Ver1.3.2-20180524-all.ttc`의 `D2Coding` 사용을 권장합니다. `launch.sh`에서 `폰트 설정`을 선택하면 폰트 파일을 `~/.local/share/fonts/`로 복사하고 폰트 캐시를 갱신합니다. 이미 폰트가 설치되어 있으면 파일을 다시 복사하지 않고 캐시만 갱신합니다. `전체 설정`에도 동일한 독립 폰트 설치 단계가 포함됩니다.
 
-시스템 기본 고정폭 폰트를 `D2Coding 12`로 바꾸려면 아래 명령을 실행합니다.
+스크립트는 터미널, Neovim, 에이전트 또는 시스템의 폰트 선택값을 변경하지 않습니다. 사용할 폰트는 각 터미널 애플리케이션에서 직접 선택합니다.
 
 ```sh
 fc-cache -f ~/.local/share/fonts
-gsettings set org.gnome.desktop.interface monospace-font-name "D2Coding 12"
 ```
 
 zsh 및 nvim의 일부 문자사용을 위해 D2coding Nerd Font 계열도 함께 복사됩니다.
@@ -37,7 +37,8 @@ zsh 및 nvim의 일부 문자사용을 위해 D2coding Nerd Font 계열도 함�
 `launch.sh`는 `scripts/` 안의 설정 스크립트를 실행합니다.
 
 - `launch.sh`
-  - zsh 설정, nvim 설정, 전체 설정 선택 시 D2Coding 폰트를 사용자 폰트 경로에 설치합니다.
+  - 폰트 설정 또는 전체 설정 선택 시 D2Coding 폰트를 사용자 폰트 경로에 설치합니다.
+  - zsh, nvim, agent 단독 설정에서는 폰트를 설치하거나 폰트 선택값을 변경하지 않습니다.
 
 - `scripts/zsh_setting_start.sh`
   - Oh My Zsh가 없으면 먼저 `~/.oh-my-zsh`에 설치합니다.

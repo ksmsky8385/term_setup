@@ -91,16 +91,6 @@ ensure_fonts() {
     fi
 }
 
-ensure_fonts_for_choice() {
-    local choice="$1"
-
-    case "$choice" in
-        1 | 2 | 4)
-            ensure_fonts
-            ;;
-    esac
-}
-
 run_script() {
     local script_path="$1"
     local label="$2"
@@ -136,9 +126,13 @@ run_selected_setup() {
             run_script "$AGENT_SCRIPT" "agent"
             ;;
         4)
+            ensure_fonts
+            ;;
+        5)
             run_script "$ZSH_SCRIPT" "zsh"
             run_script "$NVIM_SCRIPT" "nvim"
             run_script "$AGENT_SCRIPT" "agent"
+            ensure_fonts
             ;;
         *)
             echo "Error: 알 수 없는 선택입니다."
@@ -154,8 +148,9 @@ show_menu() {
     echo "1. zsh 설정"
     echo "2. nvim 설정"
     echo "3. agent 설정"
-    echo "4. 전체 설정"
-    echo "5. 나가기"
+    echo "4. 폰트 설정"
+    echo "5. 전체 설정"
+    echo "6. 나가기"
     echo "----------------------------------------------------"
 }
 
@@ -165,10 +160,11 @@ while true; do
     read -r choice
 
     case "$choice" in
-        1 | 2 | 3 | 4)
+        1 | 2 | 3 | 4 | 5)
             if ask_yes_no "설정을 진행하겠습니까?"; then
-                ensure_user_path
-                ensure_fonts_for_choice "$choice"
+                if [ "$choice" != "4" ]; then
+                    ensure_user_path
+                fi
 
                 if run_selected_setup "$choice"; then
                     echo
@@ -187,12 +183,12 @@ while true; do
                 exit 0
             fi
             ;;
-        5)
+        6)
             echo "프로그램을 종료합니다."
             exit 0
             ;;
         *)
-            echo "1부터 5 사이의 번호를 입력하세요."
+            echo "1부터 6 사이의 번호를 입력하세요."
             sleep 1
             ;;
     esac

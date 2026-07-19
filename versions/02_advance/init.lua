@@ -1,6 +1,8 @@
 require("config.options")
 require("config.paths")
 require("config.autocmds")
+require("config.autosave").setup()
+require("config.buffers.auto_close").setup()
 require("config.keymaps")
 require("config.commands")
 require("config.lazy")

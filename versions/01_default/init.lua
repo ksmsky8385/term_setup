@@ -1,69 +1,30 @@
--- =========================================================
--- 기본 설정
--- =========================================================
-
--- <leader> 키를 Space로 설정
 vim.g.mapleader = " "
 
--- 왼쪽에 실제 줄 번호 표시
 vim.opt.number = true
-
--- 상대 줄 번호
--- true면 현재 커서 기준으로 위아래 줄이 1, 2, 3처럼 표시됨
 vim.opt.relativenumber = false
-
--- 탭 기본값: 탭은 실제 탭 문자로 입력
 vim.opt.tabstop = 4
 vim.opt.shiftwidth = 4
 vim.opt.softtabstop = 4
 vim.opt.expandtab = false
-
--- 탭 입력 시 스페이스 4개 치환
-vim.api.nvim_create_autocmd("FileType", {
-    pattern = {
-		"python",
-		"java",
-		"lua",
-    },
-    callback = function()
-        vim.opt_local.tabstop = 4
-        vim.opt_local.shiftwidth = 4
-        vim.opt_local.softtabstop = 4
-        vim.opt_local.expandtab = true
-    end,
-})
-
--- 탭 문자, 화면상 2칸
-vim.api.nvim_create_autocmd("FileType", {
-    pattern = {
-        "sh",
-        "html",
-        "css",
-        "javascript",
-        "typescript",
-        "tsx",
-    },
-    callback = function()
-        vim.opt_local.tabstop = 2
-        vim.opt_local.shiftwidth = 2
-        vim.opt_local.softtabstop = 2
-        vim.opt_local.expandtab = false
-    end,
-})
-
--- 24bit 컬러 사용
 vim.opt.termguicolors = true
-
--- 시스템 클립보드와 Neovim 클립보드 연동
 vim.opt.clipboard = "unnamedplus"
 
+local function set_indent(patterns, size, expandtab)
+    vim.api.nvim_create_autocmd("FileType", {
+        pattern = patterns,
+        callback = function()
+            vim.opt_local.tabstop = size
+            vim.opt_local.shiftwidth = size
+            vim.opt_local.softtabstop = size
+            vim.opt_local.expandtab = expandtab
+        end,
+    })
+end
 
--- =========================================================
--- Tree-sitter 언어 목록
--- 여기에 원하는 언어 추가/삭제
--- =========================================================
+set_indent({ "python", "java", "lua" }, 4, true)
+set_indent({ "sh", "html", "css", "javascript", "typescript", "tsx" }, 2, false)
 
-local MY_TS_LANGS = {
+local treesitter_languages = {
     "python",
     "lua",
     "vim",
@@ -85,14 +46,9 @@ local MY_TS_LANGS = {
     "tsx",
 }
 
-
--- =========================================================
--- lazy.nvim 자동 설치
--- =========================================================
-
 local lazypath = vim.fn.stdpath("data") .. "/lazy/lazy.nvim"
 
-if not vim.loop.fs_stat(lazypath) then
+if not vim.uv.fs_stat(lazypath) then
     vim.fn.system({
         "git",
         "clone",
@@ -105,114 +61,103 @@ end
 
 vim.opt.rtp:prepend(lazypath)
 
-
--- =========================================================
--- 플러그인 설정
--- =========================================================
-
 require("lazy").setup({
-    -- -----------------------------------------------------
-    -- 색상 테마 ("default" 대신 다른 값으로 변경해야 영구적용)
-    -- -----------------------------------------------------
-    {
-        "folke/vscode.nvim",
-        lazy = false,
-        priority = 1000,
-        config = function()
-            vim.cmd.colorscheme("vscode")
-        end,
-    },
-
-    -- -----------------------------------------------------
-    -- Tree-sitter 안정판
-    -- Neovim 0.12 main API 에러 회피용 master 브랜치
-    -- -----------------------------------------------------
     {
         "nvim-treesitter/nvim-treesitter",
         branch = "master",
         lazy = false,
         build = ":TSUpdate",
-
         config = function()
             require("nvim-treesitter.configs").setup({
-                ensure_installed = MY_TS_LANGS,
-
+                ensure_installed = treesitter_languages,
                 sync_install = false,
                 auto_install = true,
-
                 highlight = {
                     enable = true,
                     additional_vim_regex_highlighting = false,
                 },
-
                 indent = {
                     enable = true,
                 },
             })
 
-            -- parser 목록 업데이트
             vim.api.nvim_create_user_command("TSMyUpdate", function()
                 vim.cmd("TSUpdate")
             end, {})
 
-            -- parser 수동 설치
-            -- 사용 예: :TSMyInstall rust
             vim.api.nvim_create_user_command("TSMyInstall", function(opts)
                 vim.cmd("TSInstall " .. opts.args)
             end, {
                 nargs = 1,
             })
 
-            -- parser 수동 삭제
-            -- 사용 예: :TSMyUninstall rust
             vim.api.nvim_create_user_command("TSMyUninstall", function(opts)
                 vim.cmd("TSUninstall " .. opts.args)
             end, {
                 nargs = 1,
             })
 
-            -- 설치 상태 확인
             vim.api.nvim_create_user_command("TSMyList", function()
                 vim.cmd("TSInstallInfo")
             end, {})
         end,
     },
-
-    -- -----------------------------------------------------
-    -- nvim-tree
-    -- 왼쪽 디렉토리 트리
-    -- -----------------------------------------------------
     {
         "nvim-tree/nvim-tree.lua",
-        dependencies = {
-            "nvim-tree/nvim-web-devicons",
+        opts = {
+            view = {
+                width = 30,
+            },
+            renderer = {
+                group_empty = true,
+                icons = {
+                    show = {
+                        file = false,
+                        folder = false,
+                        folder_arrow = false,
+                        git = false,
+                        modified = false,
+                        diagnostics = false,
+                        bookmarks = false,
+                        hidden = false,
+                    },
+                },
+            },
+            filters = {
+                dotfiles = false,
+            },
         },
-
-        config = function()
-            require("nvim-tree").setup({
-                view = {
-                    width = 30,
-                },
-
-                renderer = {
-                    group_empty = true,
-                },
-
-                filters = {
-                    dotfiles = false,
-                },
-            })
-
-            vim.keymap.set(
-                "n",
+        keys = {
+            {
                 "<leader>e",
-                ":NvimTreeToggle<CR>",
-                {
-                    noremap = true,
-                    silent = true,
-                    desc = "Toggle file tree",
-                }
-            )
+                "<cmd>NvimTreeToggle<CR>",
+                desc = "Toggle file tree",
+            },
+        },
+    },
+    {
+        "nvim-telescope/telescope.nvim",
+        dependencies = {
+            "nvim-lua/plenary.nvim",
+        },
+        config = function()
+            local builtin = require("telescope.builtin")
+
+            require("telescope").setup({})
+
+            vim.keymap.set("n", "<leader>ff", function()
+                builtin.find_files({ disable_devicons = true })
+            end, {
+                desc = "Find files",
+            })
+            vim.keymap.set("n", "<leader>fg", function()
+                builtin.live_grep({ disable_devicons = true })
+            end, {
+                desc = "Live grep",
+            })
+            vim.keymap.set("n", "<leader>fh", builtin.help_tags, {
+                desc = "Help tags",
+            })
         end,
     },
 })

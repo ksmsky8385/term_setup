@@ -46,6 +46,12 @@ end
 local function open_main()
     picker("Settings", {
         {
+            label = "Buffer settings",
+            action = function()
+                M.open("buffer")
+            end,
+        },
+        {
             label = "Change theme",
             action = function()
                 M.open("theme")
@@ -79,6 +85,34 @@ local function open_main()
             label = "Lazy settings",
             action = function()
                 vim.cmd("Lazy")
+            end,
+        },
+    })
+end
+
+local function open_buffer()
+    local autosave = require("config.autosave")
+    local auto_close = require("config.buffers.auto_close")
+
+    picker("Settings > Buffer", {
+        {
+            label = "< Back",
+            action = open_main,
+        },
+        {
+            label = "Auto save: "
+                .. (autosave.enabled() and "enabled" or "disabled"),
+            action = function()
+                autosave.toggle()
+                M.open("buffer")
+            end,
+        },
+        {
+            label = "Auto close buffer: "
+                .. (auto_close.enabled() and "enabled" or "disabled"),
+            action = function()
+                auto_close.toggle()
+                M.open("buffer")
             end,
         },
     })
@@ -420,7 +454,9 @@ local function open_snippets()
 end
 
 function M.open(menu)
-    if menu == "theme" then
+    if menu == "buffer" then
+        open_buffer()
+    elseif menu == "theme" then
         open_theme()
     elseif menu == "treesitter" then
         open_treesitter()

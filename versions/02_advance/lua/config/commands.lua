@@ -12,6 +12,12 @@ end, {
     desc = "Open settings",
 })
 
+vim.api.nvim_create_user_command("SettingsBuffer", function()
+    open_settings("buffer")
+end, {
+    desc = "Open buffer settings",
+})
+
 vim.api.nvim_create_user_command("SettingsTheme", function()
     open_settings("theme")
 end, {
