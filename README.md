@@ -22,7 +22,7 @@ sudo 권한 없이 사용자 홈 디렉토리 아래에 설치되는 구성을 �
 
 ## 터미널 폰트 권장 설정
 
-터미널 기본 폰트는 `D2Coding-Ver1.3.2-20180524-all.ttc`의 `D2Coding` 사용을 권장합니다. `launch.sh`에서 `폰트 설정`을 선택하면 폰트 파일을 `~/.local/share/fonts/`로 복사하고 폰트 캐시를 갱신합니다. 이미 폰트가 설치되어 있으면 파일을 다시 복사하지 않고 캐시만 갱신합니다. `전체 설정`에도 동일한 독립 폰트 설치 단계가 포함됩니다.
+터미널 기본 폰트는 `D2Coding-Ver1.3.2-20180524-all.ttc`의 `D2Coding` 사용을 권장합니다. 한글 UI와 일반 문서에는 가변 굵기를 지원하는 `PretendardVariable.ttf`도 사용할 수 있습니다. `launch.sh`에서 `폰트 설정`을 선택하면 D2Coding, D2Coding Nerd Font, Pretendard Variable을 `~/.local/share/fonts/`로 복사하고 폰트 캐시를 갱신합니다. 각 폰트가 이미 설치되어 있으면 해당 항목은 다시 복사하지 않습니다. `전체 설정`에도 동일한 독립 폰트 설치 단계가 포함됩니다.
 
 스크립트는 터미널, Neovim, 에이전트 또는 시스템의 폰트 선택값을 변경하지 않습니다. 사용할 폰트는 각 터미널 애플리케이션에서 직접 선택합니다.
 
@@ -30,14 +30,14 @@ sudo 권한 없이 사용자 홈 디렉토리 아래에 설치되는 구성을 �
 fc-cache -f ~/.local/share/fonts
 ```
 
-zsh 및 nvim의 일부 문자사용을 위해 D2coding Nerd Font 계열도 함께 복사됩니다.
+zsh 및 nvim의 아이콘과 특수문자 표시를 위해 D2Coding Nerd Font 계열도 함께 복사됩니다.
 
 ## 동작 원리
 
 `launch.sh`는 `scripts/` 안의 설정 스크립트를 실행합니다.
 
 - `launch.sh`
-  - 폰트 설정 또는 전체 설정 선택 시 D2Coding 폰트를 사용자 폰트 경로에 설치합니다.
+  - 폰트 설정 또는 전체 설정 선택 시 D2Coding, D2Coding Nerd Font, Pretendard Variable 폰트를 사용자 폰트 경로에 설치합니다.
   - zsh, nvim, agent 단독 설정에서는 폰트를 설치하거나 폰트 선택값을 변경하지 않습니다.
 
 - `scripts/zsh_setting_start.sh`

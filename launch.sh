@@ -10,9 +10,11 @@ USER_PATH_LINE='export PATH="$HOME/.local/bin:$PATH"'
 LOCAL_FONT_DIR="$HOME/.local/share/fonts"
 LOCAL_D2CODING_DIR="$LOCAL_FONT_DIR/D2Coding"
 LOCAL_D2CODING_TTC="$LOCAL_FONT_DIR/D2Coding-Ver1.3.2-20180524-all.ttc"
+LOCAL_PRETENDARD_TTF="$LOCAL_FONT_DIR/PretendardVariable.ttf"
 SOURCE_FONT_DIR="$SCRIPT_DIR/fonts"
 SOURCE_D2CODING_DIR="$SOURCE_FONT_DIR/D2Coding"
 SOURCE_D2CODING_TTC="$SOURCE_FONT_DIR/D2Coding-Ver1.3.2-20180524-all.ttc"
+SOURCE_PRETENDARD_TTF="$SOURCE_FONT_DIR/PretendardVariable.ttf"
 
 ensure_user_path() {
     local shell_files=("$HOME/.zshrc" "$HOME/.bashrc")
@@ -81,6 +83,16 @@ ensure_fonts() {
     else
         echo "Warning: D2Coding TTC 폰트 파일이 없습니다."
         echo "Expected: $SOURCE_D2CODING_TTC"
+    fi
+
+    if [ -f "$LOCAL_PRETENDARD_TTF" ]; then
+        echo "Pretendard Variable 폰트가 이미 설치되어 있습니다."
+    elif [ -f "$SOURCE_PRETENDARD_TTF" ]; then
+        echo "Pretendard Variable 폰트를 설치합니다."
+        cp "$SOURCE_PRETENDARD_TTF" "$LOCAL_PRETENDARD_TTF"
+    else
+        echo "Warning: Pretendard Variable 폰트 파일이 없습니다."
+        echo "Expected: $SOURCE_PRETENDARD_TTF"
     fi
 
     if command -v fc-cache >/dev/null 2>&1; then
