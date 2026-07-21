@@ -5,6 +5,7 @@ M.save_path = vim.fn.stdpath("state") .. "/buffer-settings.json"
 local defaults = {
     auto_save = true,
     auto_close = false,
+    end_of_buffer_markers = true,
 }
 
 local values

@@ -93,6 +93,7 @@ end
 local function open_buffer()
     local autosave = require("config.autosave")
     local auto_close = require("config.buffers.auto_close")
+    local end_of_buffer = require("config.end_of_buffer")
 
     picker("Settings > Buffer", {
         {
@@ -115,15 +116,36 @@ local function open_buffer()
                 M.open("buffer")
             end,
         },
+        {
+            label = "End-of-buffer ~ markers: "
+                .. (end_of_buffer.enabled() and "enabled" or "disabled"),
+            action = function()
+                end_of_buffer.toggle()
+                M.open("buffer")
+            end,
+        },
     })
 end
 
 local function open_theme()
     local active = current_theme()
+    local terminal_background = themes.terminal_background_enabled()
     local entries = {
         {
             label = "< Back",
             action = open_main,
+        },
+        {
+            label = "Use terminal background: "
+                .. (terminal_background and "enabled" or "disabled"),
+            ordinal = "terminal background",
+            action = function()
+                local enabled = themes.toggle_terminal_background()
+                vim.notify(
+                    "Terminal background: " .. (enabled and "enabled" or "disabled")
+                )
+                M.open("theme")
+            end,
         },
     }
 
