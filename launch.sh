@@ -6,6 +6,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ZSH_SCRIPT="$SCRIPT_DIR/scripts/zsh_setting_start.sh"
 NVIM_SCRIPT="$SCRIPT_DIR/scripts/nvim_setting_start.sh"
 AGENT_SCRIPT="$SCRIPT_DIR/scripts/agent_setting_start.sh"
+BTOP_SCRIPT="$SCRIPT_DIR/scripts/btop_setting_start.sh"
+PACKAGE_SCRIPT="$SCRIPT_DIR/scripts/package_management_start.sh"
 USER_PATH_LINE='export PATH="$HOME/.local/bin:$PATH"'
 LOCAL_FONT_DIR="$HOME/.local/share/fonts"
 LOCAL_D2CODING_DIR="$LOCAL_FONT_DIR/D2Coding"
@@ -138,12 +140,9 @@ run_selected_setup() {
             run_script "$AGENT_SCRIPT" "agent"
             ;;
         4)
-            ensure_fonts
+            run_script "$BTOP_SCRIPT" "btop"
             ;;
         5)
-            run_script "$ZSH_SCRIPT" "zsh"
-            run_script "$NVIM_SCRIPT" "nvim"
-            run_script "$AGENT_SCRIPT" "agent"
             ensure_fonts
             ;;
         *)
@@ -157,11 +156,12 @@ show_menu() {
     clear 2>/dev/null || true
     echo "CLI 프로그래밍 환경 통합 설정"
     echo "----------------------------------------------------"
+    echo "0. 패키지 관리"
     echo "1. zsh 설정"
     echo "2. nvim 설정"
     echo "3. agent 설정"
-    echo "4. 폰트 설정"
-    echo "5. 전체 설정"
+    echo "4. btop 설정"
+    echo "5. 폰트 설정"
     echo "6. 나가기"
     echo "----------------------------------------------------"
 }
@@ -172,9 +172,21 @@ while true; do
     read -r choice
 
     case "$choice" in
+        0)
+            package_status=0
+            run_script "$PACKAGE_SCRIPT" "패키지 관리" || package_status=$?
+
+            if [ "$package_status" -eq 20 ]; then
+                cd "$SCRIPT_DIR"
+                echo "패키지 루트에서 현재 터미널 셸을 시작합니다: $SCRIPT_DIR"
+                exec "${SHELL:-/bin/bash}" -l
+            elif [ "$package_status" -ne 0 ]; then
+                echo "패키지 관리 중 오류가 발생했습니다."
+            fi
+            ;;
         1 | 2 | 3 | 4 | 5)
             if ask_yes_no "설정을 진행하겠습니까?"; then
-                if [ "$choice" != "4" ]; then
+                if [ "$choice" != "5" ]; then
                     ensure_user_path
                 fi
 
@@ -200,7 +212,7 @@ while true; do
             exit 0
             ;;
         *)
-            echo "1부터 6 사이의 번호를 입력하세요."
+            echo "0부터 6 사이의 번호를 입력하세요."
             sleep 1
             ;;
     esac

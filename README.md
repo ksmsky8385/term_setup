@@ -12,17 +12,18 @@ sudo 권한 없이 사용자 홈 디렉토리 아래에 설치되는 구성을 �
 메뉴에서 원하는 설정을 선택합니다.
 
 ```text
+0. 패키지 관리
 1. zsh 설정
 2. nvim 설정
 3. agent 설정
-4. 폰트 설정
-5. 전체 설정
+4. btop 설정
+5. 폰트 설정
 6. 나가기
 ```
 
 ## 터미널 폰트 권장 설정
 
-터미널 기본 폰트는 `D2Coding-Ver1.3.2-20180524-all.ttc`의 `D2Coding` 사용을 권장합니다. 한글 UI와 일반 문서에는 가변 굵기를 지원하는 `PretendardVariable.ttf`도 사용할 수 있습니다. `launch.sh`에서 `폰트 설정`을 선택하면 D2Coding, D2Coding Nerd Font, Pretendard Variable을 `~/.local/share/fonts/`로 복사하고 폰트 캐시를 갱신합니다. 각 폰트가 이미 설치되어 있으면 해당 항목은 다시 복사하지 않습니다. `전체 설정`에도 동일한 독립 폰트 설치 단계가 포함됩니다.
+터미널 기본 폰트는 `D2Coding-Ver1.3.2-20180524-all.ttc`의 `D2Coding` 사용을 권장합니다. 한글 UI와 일반 문서에는 가변 굵기를 지원하는 `PretendardVariable.ttf`도 사용할 수 있습니다. `launch.sh`에서 `폰트 설정`을 선택하면 D2Coding, D2Coding Nerd Font, Pretendard Variable을 `~/.local/share/fonts/`로 복사하고 폰트 캐시를 갱신합니다. 각 폰트가 이미 설치되어 있으면 해당 항목은 다시 복사하지 않습니다.
 
 스크립트는 터미널, Neovim, 에이전트 또는 시스템의 폰트 선택값을 변경하지 않습니다. 사용할 폰트는 각 터미널 애플리케이션에서 직접 선택합니다.
 
@@ -37,8 +38,8 @@ zsh 및 nvim의 아이콘과 특수문자 표시를 위해 D2Coding Nerd Font �
 `launch.sh`는 `scripts/` 안의 설정 스크립트를 실행합니다.
 
 - `launch.sh`
-  - 폰트 설정 또는 전체 설정 선택 시 D2Coding, D2Coding Nerd Font, Pretendard Variable 폰트를 사용자 폰트 경로에 설치합니다.
-  - zsh, nvim, agent 단독 설정에서는 폰트를 설치하거나 폰트 선택값을 변경하지 않습니다.
+  - 폰트 설정 선택 시 D2Coding, D2Coding Nerd Font, Pretendard Variable 폰트를 사용자 폰트 경로에 설치합니다.
+  - zsh, nvim, agent, btop 설정에서는 폰트를 설치하거나 폰트 선택값을 변경하지 않습니다.
 
 - `scripts/zsh_setting_start.sh`
   - Oh My Zsh가 없으면 먼저 `~/.oh-my-zsh`에 설치합니다.
@@ -52,6 +53,19 @@ zsh 및 nvim의 아이콘과 특수문자 표시를 위해 D2Coding Nerd Font �
 
 - `scripts/agent_setting_start.sh`
   - CLI 에이전트(Antigravity, Codex, GitHub Copilot)의 설치/삭제 및 캐시 삭제 기능 등을 제공합니다.
+
+- `scripts/btop_setting_start.sh`
+  - 최신 btop Linux 바이너리를 `~/.local/bin`에 설치합니다.
+
+- `scripts/package_management_start.sh`
+  - 원격 Git 커밋을 확인하고 동의하면 패키지를 업데이트합니다.
+  - 별도 캐시 정리 스크립트를 실행합니다.
+  - 현재 스크립트를 종료하고 패키지 루트 경로를 CWD로 사용하는 로그인 셸로 전환합니다.
+
+- `scripts/cache_cleanup_start.sh`
+  - 파일 상단의 `CACHE_PATHS` 배열에 지정된 캐시 경로를 확인 후 삭제합니다.
+  - 삭제 경로는 절대 경로 형식으로 자유롭게 추가하거나 제거할 수 있습니다.
+  - Codex standalone 업데이트가 남긴 이전 버전 패키지를 삭제하고 현재 버전은 유지합니다.
 
 ## 설치 대상
 
