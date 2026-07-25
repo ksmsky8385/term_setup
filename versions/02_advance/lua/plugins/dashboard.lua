@@ -250,6 +250,17 @@ return {
             alpha.move_cursor(vim.api.nvim_get_current_win())
         end
 
+        local function focus_first_dashboard_button()
+            local rows = dashboard_button_rows()
+
+            if #rows == 0 then
+                return
+            end
+
+            vim.api.nvim_win_set_cursor(0, { rows[1], 0 })
+            alpha.move_cursor(vim.api.nvim_get_current_win())
+        end
+
         local function is_returnable_buffer(buf)
             local is_empty_unnamed_buffer = vim.api.nvim_buf_is_valid(buf)
                 and vim.api.nvim_buf_get_name(buf) == ""
@@ -447,6 +458,7 @@ return {
                 vim.keymap.set("n", "<Up>", function()
                     move_dashboard_cursor(-1)
                 end, opts)
+                vim.keymap.set("n", "<Esc>", focus_first_dashboard_button, opts)
 
                 vim.keymap.set("n", "<leader>q", close_dashboard_or_quit, opts)
                 vim.keymap.set("n", "<leader>h", function()
