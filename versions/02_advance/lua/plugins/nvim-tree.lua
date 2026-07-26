@@ -236,34 +236,6 @@ return {
             })
         end
 
-        local function toggle_markdown_preview()
-            local node = api.tree.get_node_under_cursor()
-
-            if
-                not node
-                or node.type ~= "file"
-                or vim.filetype.match({ filename = node.absolute_path }) ~= "markdown"
-            then
-                return
-            end
-
-            require("lazy").load({
-                plugins = { "markdown-preview.nvim" },
-            })
-
-            local bufnr = vim.fn.bufadd(node.absolute_path)
-
-            vim.fn.bufload(bufnr)
-
-            if vim.bo[bufnr].filetype == "" then
-                vim.bo[bufnr].filetype = "markdown"
-            end
-
-            vim.api.nvim_buf_call(bufnr, function()
-                vim.fn["mkdp#util#toggle_preview"]()
-            end)
-        end
-
         local function change_tree_root(path)
             if type(path) ~= "string" or path == "" or vim.fn.isdirectory(path) == 0 then
                 return false
@@ -434,13 +406,6 @@ return {
                     "<Tab>",
                     open_preview,
                     opts("Preview file")
-                )
-
-                vim.keymap.set(
-                    "n",
-                    "<leader>mp",
-                    toggle_markdown_preview,
-                    opts("Toggle selected Markdown preview")
                 )
 
                 vim.keymap.set(

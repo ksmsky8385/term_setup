@@ -290,7 +290,7 @@ function M.open()
         "  Markdown",
         "",
         "    Space mp           브라우저 Markdown 미리보기 열기/닫기",
-        "    동작 조건          Markdown 버퍼 또는 트리에서 선택한 Markdown 파일",
+        "    동작 조건          Markdown 파일에서만 사용 가능",
         "",
         "  Minimap",
         "",
