@@ -203,7 +203,9 @@ return {
             vim.wo[preview_win].cursorline = true
             vim.wo[preview_win].number = false
             vim.wo[preview_win].relativenumber = false
-            vim.wo[preview_win].wrap = false
+            vim.wo[preview_win].wrap = opts.wrap == true
+            vim.wo[preview_win].linebreak = opts.wrap == true
+            vim.wo[preview_win].breakindent = opts.wrap == true
 
             vim.keymap.set("n", "<C-Left>", focus_tree, {
                 buffer = preview_buf,
@@ -265,7 +267,10 @@ return {
             show_preview(
                 "file:" .. node.absolute_path,
                 lines,
-                vim.filetype.match({ filename = node.absolute_path })
+                vim.filetype.match({ filename = node.absolute_path }),
+                {
+                    wrap = true,
+                }
             )
         end
 
