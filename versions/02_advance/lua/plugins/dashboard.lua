@@ -424,6 +424,24 @@ return {
             pcall(vim.cmd, "AlphaRedraw")
         end
 
+        vim.api.nvim_create_autocmd("User", {
+            pattern = "WorkspaceChanged",
+            callback = function()
+                dashboard.section.header.val = make_header()
+                alpha.setup(dashboard.opts)
+
+                for _, win in ipairs(vim.api.nvim_list_wins()) do
+                    local buf = vim.api.nvim_win_get_buf(win)
+
+                    if is_dashboard_buffer(buf) then
+                        pcall(vim.api.nvim_win_call, win, function()
+                            vim.cmd("AlphaRedraw")
+                        end)
+                    end
+                end
+            end,
+        })
+
         dashboard.section.header.val = make_header()
         dashboard.section.buttons.val = dashboard_buttons
         dashboard.section.footer.val = {}

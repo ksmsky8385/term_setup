@@ -44,6 +44,20 @@ local function current_window_cwd(win)
     return vim.fn.getcwd()
 end
 
+local function terminal_cwd(buf, win)
+    local ok, terminal = pcall(require, "config.terminal")
+
+    if ok and type(terminal.actual_cwd) == "function" then
+        local cwd = terminal.actual_cwd(buf)
+
+        if cwd then
+            return cwd
+        end
+    end
+
+    return valid_window(win) and current_window_cwd(win) or vim.fn.getcwd()
+end
+
 local function window_view(win)
     local current_win = vim.api.nvim_get_current_win()
     local ok_set = pcall(vim.api.nvim_set_current_win, win)
@@ -144,7 +158,7 @@ buffer_descriptor = function(buf, win)
     if buftype == "terminal" then
         return {
             kind = "terminal",
-            cwd = valid_window(win) and current_window_cwd(win) or vim.fn.getcwd(),
+            cwd = terminal_cwd(buf, win),
             shell = vim.o.shell,
         }
     end

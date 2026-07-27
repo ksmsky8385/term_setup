@@ -13,6 +13,7 @@ end
 
 function M.current_terminal_windows()
     local terminals = {}
+    local ok_terminal, terminal = pcall(require, "config.terminal")
 
     for tab_index, tab in ipairs(vim.api.nvim_list_tabpages()) do
         for win_index, win in ipairs(tabpage_windows(tab)) do
@@ -22,6 +23,10 @@ function M.current_terminal_windows()
                 local cwd = vim.api.nvim_win_call(win, function()
                     return vim.fn.getcwd()
                 end)
+
+                if ok_terminal and type(terminal.actual_cwd) == "function" then
+                    cwd = terminal.actual_cwd(buf) or cwd
+                end
 
                 table.insert(terminals, {
                     tab = tab_index,

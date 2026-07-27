@@ -35,6 +35,26 @@ function M.valid_terminal(buf)
         and job_running(vim.b[buf].terminal_job_id)
 end
 
+function M.actual_cwd(buf)
+    if not M.valid_terminal(buf) then
+        return nil
+    end
+
+    local ok_pid, pid = pcall(vim.fn.jobpid, vim.b[buf].terminal_job_id)
+
+    if not ok_pid or type(pid) ~= "number" or pid <= 0 then
+        return nil
+    end
+
+    local cwd = vim.uv.fs_readlink("/proc/" .. pid .. "/cwd")
+
+    if type(cwd) ~= "string" or vim.fn.isdirectory(cwd) == 0 then
+        return nil
+    end
+
+    return vim.fs.normalize(cwd)
+end
+
 function M.is_status_terminal()
     local win = vim.g.statusline_winid or vim.api.nvim_get_current_win()
     local buf = vim.api.nvim_win_get_buf(win)

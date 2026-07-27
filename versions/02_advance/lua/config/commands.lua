@@ -163,15 +163,7 @@ vim.api.nvim_create_user_command("WorkspacePick", function()
 
         path = vim.fn.expand(path)
 
-        if vim.fn.isdirectory(path) == 0 then
-            vim.notify("Directory not found: " .. path, vim.log.levels.ERROR)
-            return
-        end
-
-        vim.cmd("cd " .. vim.fn.fnameescape(path))
-        vim.g.current_workspace_root = vim.fn.getcwd()
-
-        vim.notify(" -> Workspace changed: " .. vim.g.current_workspace_root)
+        require("config.workspace").change(path)
     end)
 end, {})
 

@@ -132,20 +132,11 @@ return {
             return open_target_windows()[1]
         end
 
-        local function open_preview()
-            local node = api.tree.get_node_under_cursor()
-
-            if not node then
-                return
-            end
-
-            if node.type ~= "file" then
-                api.node.open.edit(node)
-                return
-            end
+        local function show_preview(identifier, lines, filetype, opts)
+            opts = opts or {}
 
             if
-                preview_path == node.absolute_path
+                preview_path == identifier
                 and preview_win
                 and vim.api.nvim_win_is_valid(preview_win)
             then
@@ -159,21 +150,30 @@ return {
             local col = tree_pos[2] + tree_width + 1
             local max_width = vim.o.columns - col - 2
 
-            if max_width < 24 then
+            if max_width < (opts.compact and 1 or 24) then
                 vim.notify("Not enough room to preview file", vim.log.levels.WARN)
                 return
             end
 
-            local ok, lines = pcall(vim.fn.readfile, node.absolute_path, "", 10000)
+            local preview_width = math.min(90, max_width)
+            local preview_height =
+                math.max(8, math.min(vim.o.lines - tree_pos[1] - 4, 30))
 
-            if not ok then
-                vim.notify("Can't preview this file", vim.log.levels.WARN)
-                return
+            if opts.compact then
+                local content_width = 1
+
+                for _, line in ipairs(lines) do
+                    content_width =
+                        math.max(content_width, vim.fn.strdisplaywidth(line))
+                end
+
+                preview_width = math.min(content_width, max_width)
+                preview_height = math.max(1, #lines)
             end
 
             close_preview()
             preview_tree_win = tree_win
-            preview_path = node.absolute_path
+            preview_path = identifier
 
             preview_buf = vim.api.nvim_create_buf(false, true)
             vim.api.nvim_buf_set_name(preview_buf, "nvim-tree-preview")
@@ -186,8 +186,6 @@ return {
             vim.bo[preview_buf].modifiable = false
             vim.bo[preview_buf].readonly = true
 
-            local filetype = vim.filetype.match({ filename = node.absolute_path })
-
             if filetype then
                 vim.bo[preview_buf].filetype = filetype
             end
@@ -196,8 +194,8 @@ return {
                 relative = "editor",
                 row = tree_pos[1],
                 col = col,
-                width = math.min(90, max_width),
-                height = math.max(8, math.min(vim.o.lines - tree_pos[1] - 4, 30)),
+                width = preview_width,
+                height = preview_height,
                 border = "rounded",
                 style = "minimal",
             })
@@ -234,6 +232,41 @@ return {
                 silent = true,
                 desc = "Close file preview",
             })
+        end
+
+        local function open_preview()
+            local node = api.tree.get_node_under_cursor()
+
+            if not node then
+                return
+            end
+
+            if not node.parent then
+                show_preview("root:" .. node.absolute_path, {
+                    node.absolute_path,
+                }, nil, {
+                    compact = true,
+                })
+                return
+            end
+
+            if node.type ~= "file" then
+                api.node.open.edit(node)
+                return
+            end
+
+            local ok, lines = pcall(vim.fn.readfile, node.absolute_path, "", 10000)
+
+            if not ok then
+                vim.notify("Can't preview this file", vim.log.levels.WARN)
+                return
+            end
+
+            show_preview(
+                "file:" .. node.absolute_path,
+                lines,
+                vim.filetype.match({ filename = node.absolute_path })
+            )
         end
 
         local function change_tree_root(path)
@@ -349,12 +382,22 @@ return {
                 return
             end
 
-            if node and node.type == "file" then
+            if node.type ~= "file" then
                 close_preview()
-            else
-                api.node.open.edit(node)
+                local path = node.absolute_path
+
+                if not node.parent then
+                    path = vim.fs.dirname(path)
+                end
+
+                api.tree.change_root_to_node(node)
+                require("config.workspace").change(path, {
+                    notify = false,
+                })
                 return
             end
+
+            close_preview()
 
             if mode == "pick" then
                 if not pick_tab_for_window() then
@@ -384,6 +427,21 @@ return {
             open_file_in_window(node, primary_open_window())
         end
 
+        local function root_folder_label(path)
+            local normalized_path = vim.fs.normalize(path)
+            local home = vim.fs.normalize(vim.fn.expand("~"))
+
+            if normalized_path == home then
+                return vim.fs.basename(home)
+            end
+
+            if normalized_path == "/" then
+                return "/"
+            end
+
+            return "../" .. vim.fs.basename(normalized_path)
+        end
+
         require("nvim-tree").setup({
             sync_root_with_cwd = true,
             respect_buf_cwd = true,
@@ -405,7 +463,7 @@ return {
                     "n",
                     "<Tab>",
                     open_preview,
-                    opts("Preview file")
+                    opts("Preview path/file or toggle directory")
                 )
 
                 vim.keymap.set(
@@ -414,7 +472,7 @@ return {
                     function()
                         open_node()
                     end,
-                    opts("Open primary window")
+                    opts("Open file or change tree root")
                 )
 
                 vim.keymap.set(
@@ -423,7 +481,7 @@ return {
                     function()
                         open_node()
                     end,
-                    opts("Open primary window")
+                    opts("Open file or change tree root")
                 )
 
                 vim.keymap.set(
@@ -432,7 +490,7 @@ return {
                     function()
                         open_node()
                     end,
-                    opts("Open primary window")
+                    opts("Open file or change tree root")
                 )
 
                 vim.keymap.set(
@@ -504,6 +562,7 @@ return {
 
             renderer = {
                 group_empty = true,
+                root_folder_label = root_folder_label,
             },
 
             filters = {
