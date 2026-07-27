@@ -7,6 +7,7 @@ return {
     config = function()
         local buffers = require("config.buffers")
         local swap = require("config.swap")
+        local tree_settings = require("config.tree_settings")
         local window_picker = require("config.window_picker")
         local api = require("nvim-tree.api")
         local preview_win
@@ -608,6 +609,16 @@ return {
                     opts("Delete permanently")
                 )
 
+                vim.keymap.set("n", "H", function()
+                    api.filter.dotfiles.toggle()
+                    tree_settings.toggle("dotfiles")
+                end, opts("Toggle dotfiles"))
+
+                vim.keymap.set("n", "I", function()
+                    api.filter.git.ignored.toggle()
+                    tree_settings.toggle("git_ignored")
+                end, opts("Toggle Git ignored files"))
+
                 vim.keymap.set(
                     "n",
                     "<Esc>",
@@ -640,7 +651,8 @@ return {
             },
 
             filters = {
-                dotfiles = false,
+                dotfiles = tree_settings.get("dotfiles"),
+                git_ignored = tree_settings.get("git_ignored"),
             },
 
             trash = {
