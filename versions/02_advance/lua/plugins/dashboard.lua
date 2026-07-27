@@ -199,6 +199,42 @@ return {
             return rows
         end
 
+        local function click_dashboard_button()
+            local mouse = vim.fn.getmousepos()
+            local win = mouse.winid
+
+            if win == 0 or not vim.api.nvim_win_is_valid(win) then
+                return
+            end
+
+            local buf = vim.api.nvim_win_get_buf(win)
+
+            if
+                not vim.api.nvim_buf_is_valid(buf)
+                or vim.bo[buf].filetype ~= "alpha"
+                or mouse.line < 1
+            then
+                return
+            end
+
+            local line = vim.api.nvim_buf_get_lines(
+                buf,
+                mouse.line - 1,
+                mouse.line,
+                false
+            )[1] or ""
+
+            for _, button in ipairs(dashboard_buttons) do
+                if string.find(line, button.val, 1, true) then
+                    vim.api.nvim_set_current_win(win)
+                    vim.api.nvim_win_set_cursor(win, { mouse.line, 0 })
+                    alpha.move_cursor(win)
+                    button.on_press()
+                    return
+                end
+            end
+        end
+
         local function move_dashboard_cursor(delta)
             local rows = dashboard_button_rows()
 
@@ -477,6 +513,7 @@ return {
                     move_dashboard_cursor(-1)
                 end, opts)
                 vim.keymap.set("n", "<Esc>", focus_first_dashboard_button, opts)
+                vim.keymap.set("n", "<2-LeftMouse>", click_dashboard_button, opts)
 
                 vim.keymap.set("n", "<leader>q", close_dashboard_or_quit, opts)
                 vim.keymap.set("n", "<leader>h", function()

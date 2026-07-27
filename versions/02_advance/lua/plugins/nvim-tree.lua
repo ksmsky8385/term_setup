@@ -168,7 +168,10 @@ return {
                 end
 
                 preview_width = math.min(content_width, max_width)
-                preview_height = math.max(1, #lines)
+                preview_height = math.max(
+                    1,
+                    math.min(#lines, vim.o.lines - tree_pos[1] - 4)
+                )
             end
 
             close_preview()
@@ -274,35 +277,41 @@ return {
             )
         end
 
-        local function change_tree_root(path)
-            if type(path) ~= "string" or path == "" or vim.fn.isdirectory(path) == 0 then
-                return false
-            end
-
-            if api.tree.change_root then
-                pcall(api.tree.change_root, path)
-                return true
-            end
-
-            if api.tree.change_root_to_node then
-                pcall(api.tree.change_root_to_node, path)
-                return true
-            end
-
-            pcall(api.tree.open, {
-                path = path,
-                focus = true,
-            })
-
-            return true
-        end
-
-        local function close_preview_or_restore_root()
+        local function close_preview_or_show_help()
             if close_preview() then
                 return
             end
 
-            change_tree_root(vim.g.current_workspace_root or vim.fn.getcwd())
+            show_preview("nvim-tree-help", {
+                " nvim-tree shortcuts",
+                "",
+                " Navigation",
+                " Tab          Preview path/file or toggle folder",
+                " Enter / o    Open file or change cwd",
+                " Double-click Same action as Tab/Enter by node type",
+                " Ctrl+double   Run the opposite mouse action",
+                " Esc          Close preview/help",
+                "",
+                " File management",
+                " a            Create file or folder (folder: trailing /)",
+                " r            Rename",
+                " e            Rename basename",
+                " x / c / p    Cut / copy / paste",
+                " d            Move to trash",
+                " D            Delete permanently",
+                " y / Y        Copy name / relative path",
+                " gy           Copy absolute path",
+                "",
+                " View",
+                " H            Toggle dotfiles",
+                " I            Toggle Git ignored files",
+                " f / F        Start / clear live filter",
+                " E / W        Expand / collapse all",
+                " R            Refresh",
+                " g?           Open full built-in help",
+            }, nil, {
+                compact = true,
+            })
         end
 
         local function open_file_in_window(node, target_win)
@@ -447,6 +456,43 @@ return {
             return "../" .. vim.fs.basename(normalized_path)
         end
 
+        local function focus_mouse_node()
+            local mouse = vim.fn.getmousepos()
+
+            if mouse.winid == 0 or not vim.api.nvim_win_is_valid(mouse.winid) then
+                return
+            end
+
+            if mouse.line < 1 then
+                return
+            end
+
+            vim.api.nvim_set_current_win(mouse.winid)
+            vim.api.nvim_win_set_cursor(mouse.winid, { mouse.line, 0 })
+        end
+
+        local function open_mouse(invert)
+            focus_mouse_node()
+
+            local node = api.tree.get_node_under_cursor()
+
+            if not node then
+                return
+            end
+
+            local preview_action = node.type ~= "file"
+
+            if invert then
+                preview_action = not preview_action
+            end
+
+            if preview_action then
+                open_preview()
+            else
+                open_node()
+            end
+        end
+
         require("nvim-tree").setup({
             sync_root_with_cwd = true,
             respect_buf_cwd = true,
@@ -491,11 +537,34 @@ return {
 
                 vim.keymap.set(
                     "n",
+                    "<LeftMouse>",
+                    focus_mouse_node,
+                    opts("Select node")
+                )
+
+                vim.keymap.set(
+                    "n",
                     "<2-LeftMouse>",
                     function()
-                        open_node()
+                        open_mouse(false)
                     end,
-                    opts("Open file or change tree root")
+                    opts("Open node by type")
+                )
+
+                vim.keymap.set(
+                    "n",
+                    "<C-LeftMouse>",
+                    focus_mouse_node,
+                    opts("Select node")
+                )
+
+                vim.keymap.set(
+                    "n",
+                    "<C-2-LeftMouse>",
+                    function()
+                        open_mouse(true)
+                    end,
+                    opts("Open node with inverse action")
                 )
 
                 vim.keymap.set(
@@ -542,8 +611,8 @@ return {
                 vim.keymap.set(
                     "n",
                     "<Esc>",
-                    close_preview_or_restore_root,
-                    opts("Close preview or restore tree root")
+                    close_preview_or_show_help,
+                    opts("Close preview or show file tree help")
                 )
 
                 vim.keymap.set(
