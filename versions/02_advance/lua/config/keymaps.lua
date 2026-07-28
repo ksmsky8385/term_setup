@@ -368,6 +368,18 @@ end, {
     desc = "Open dashboard in current window",
 })
 
+vim.keymap.set("n", "<leader>?", function()
+    if is_nvim_tree() then
+        return
+    end
+
+    require("config.about").toggle()
+end, {
+    noremap = true,
+    silent = true,
+    desc = "Toggle About Neovim",
+})
+
 vim.keymap.set("n", "<leader>tt", terminal.create_buffer_terminal, {
     noremap = true,
     silent = true,
@@ -480,6 +492,12 @@ vim.keymap.set("n", "<leader><C-q>", ":q<CR>", {
     noremap = true,
     silent = true,
     desc = "Close current window",
+})
+
+vim.keymap.set("n", "<leader><Esc>", "<Cmd>DashboardQuit<CR>", {
+    noremap = true,
+    silent = true,
+    desc = "Safely quit Neovim",
 })
 
 vim.keymap.set("n", "<leader>q", function()

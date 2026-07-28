@@ -294,7 +294,22 @@ return {
                 )
             end
 
+            local function prompt_python_module()
+                return vim.fn.input("Python module: ", "src")
+            end
+
             dap.configurations.python = {
+                {
+                    type = "python",
+                    request = "launch",
+                    name = "Python: module with args",
+                    module = prompt_python_module,
+                    cwd = "${workspaceFolder}",
+                    console = "integratedTerminal",
+                    python = debugger.python_executable,
+                    env = debugger.python_environment,
+                    args = debugger.prompt_args,
+                },
                 {
                     type = "python",
                     request = "launch",
@@ -391,6 +406,11 @@ return {
             end, "DAP show runtime path")
             map("n", "<leader>dr", dap.repl.open, "DAP open REPL")
             map("n", "<leader>dq", dap.terminate, "DAP terminate")
+
+            pcall(vim.api.nvim_del_user_command, "DapToggleBreakpoint")
+            vim.api.nvim_create_user_command("DapTBreakpoint", dap.toggle_breakpoint, {
+                desc = "Toggle breakpoint",
+            })
         end,
     },
 

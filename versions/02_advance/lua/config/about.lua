@@ -1,24 +1,128 @@
 local M = {}
 local empty_buffers = require("config.empty_buffers")
 
-local function back_to_dashboard()
-    pcall(vim.cmd, "DashboardHome")
+local section_definitions = {
+    ["빠른 시작"] = { index = 0, title = "Quick Start", description = "자주 쓰는 기본 단축키" },
+    ["자동완성 / 스니펫"] = { index = 1, title = "Autocomplete & Snippets", description = "완성 후보와 스니펫 관리" },
+    ["버퍼"] = { index = 2, title = "Buffers", description = "버퍼 탐색, 이동 및 닫기" },
+    ["주석 및 42header"] = { index = 3, title = "Comments & 42 Header", description = "주석과 42 헤더 사용법" },
+    ["대시보드 / About"] = { index = 4, title = "Dashboard & About", description = "홈 화면과 도움말 화면" },
+    ["디버깅 / DAP"] = { index = 5, title = "Debugging & DAP", description = "중단점과 디버깅 실행" },
+    ["종료"] = { index = 6, title = "Exit", description = "창, 버퍼 및 Neovim 종료" },
+    ["파일 트리"] = { index = 7, title = "File Tree", description = "파일 트리 탐색과 조작" },
+    ["Git"] = { index = 8, title = "Git", description = "LazyGit과 변경 사항 관리" },
+    ["42 Header 설정"] = { index = 9, title = "Header Settings (42)", description = "42 헤더 사용자 정보 설정" },
+    ["LSP / 진단"] = { index = 10, title = "LSP & Diagnostics", description = "코드 탐색, 액션 및 진단" },
+    ["Markdown"] = { index = 11, title = "Markdown", description = "Markdown 브라우저 미리보기" },
+    ["Minimap"] = { index = 12, title = "Minimap", description = "미니맵과 스크롤바 제어" },
+    ["검색 / 탐색"] = { index = 13, title = "Search & Navigation", description = "파일, 문자열 및 도움말 검색" },
+    ["세션"] = { index = 14, title = "Sessions", description = "작업 세션 저장과 복원" },
+    ["설정 / 관리"] = { index = 15, title = "Settings & Management", description = "플러그인과 개발 도구 설정" },
+    ["탭"] = { index = 16, title = "Tabs", description = "탭 생성, 이동 및 닫기" },
+    ["터미널 / 플로팅"] = { index = 17, title = "Terminal & Floating Windows", description = "터미널과 플로팅 슬롯 관리" },
+    ["테마"] = { index = 18, title = "Themes", description = "색상 테마 선택과 저장" },
+    ["Tree-sitter"] = { index = 19, title = "Tree-sitter", description = "언어 파서 설치와 관리" },
+    ["창"] = { index = 20, title = "Windows", description = "창 선택, 분할 및 크기 조절" },
+}
+
+local function organize_sections(lines)
+    local header = {}
+    local sections = {}
+    local current
+
+    for _, line in ipairs(lines) do
+        local source_title = line:match("^  (.+)$")
+        local definition = source_title and section_definitions[source_title]
+
+        if definition then
+            current = {
+                index = definition.index,
+                lines = {
+                    string.format("  %02d. %s", definition.index, definition.title),
+                },
+            }
+            sections[#sections + 1] = current
+        elseif current then
+            current.lines[#current.lines + 1] = line
+        else
+            header[#header + 1] = line
+        end
+    end
+
+    table.sort(sections, function(left, right)
+        return left.index < right.index
+    end)
+
+    local organized = vim.list_extend({}, header)
+    local section_targets = {}
+    local toc_targets = {}
+
+    organized[#organized + 1] = "  Contents"
+    organized[#organized + 1] = ""
+
+    for _, section in ipairs(sections) do
+        local definition
+
+        for _, candidate in pairs(section_definitions) do
+            if candidate.index == section.index then
+                definition = candidate
+                break
+            end
+        end
+
+        organized[#organized + 1] = string.format(
+            "    %02d. %s — %s",
+            section.index,
+            definition.title,
+            definition.description
+        )
+        toc_targets[#organized] = section.index
+    end
+
+    organized[#organized + 1] = ""
+
+    for _, section in ipairs(sections) do
+        section_targets[section.index] = #organized + 1
+        vim.list_extend(organized, section.lines)
+    end
+
+    return organized, section_targets, toc_targets
+end
+
+local function back_to_previous_buffer()
+    local about_buf = vim.api.nvim_get_current_buf()
+    local previous_buf = vim.b[about_buf].config_about_previous_buf
+
+    if
+        type(previous_buf) == "number"
+        and vim.api.nvim_buf_is_valid(previous_buf)
+        and previous_buf ~= about_buf
+    then
+        vim.api.nvim_win_set_buf(0, previous_buf)
+    else
+        pcall(vim.cmd, "DashboardHome")
+    end
+
     empty_buffers.cleanup({
         keep = { vim.api.nvim_get_current_buf() },
     })
 end
 
 function M.open()
+    if vim.b.config_about_neovim then
+        return
+    end
+
+    local previous_buf = vim.api.nvim_get_current_buf()
+
     vim.cmd("enew")
     vim.bo.buftype = "nofile"
     vim.bo.bufhidden = "wipe"
     vim.bo.swapfile = false
     vim.bo.modifiable = true
     vim.b.config_about_neovim = true
+    vim.b.config_about_previous_buf = previous_buf
     vim.wo.cursorline = true
-    empty_buffers.cleanup({
-        keep = { vim.api.nvim_get_current_buf() },
-    })
 
     local version = vim.version()
     local version_text = string.format(
@@ -39,6 +143,7 @@ function M.open()
         "",
         "    Ctrl-s             일반 파일 저장",
         "    Space h            대시보드로 돌아가기",
+        "    Space ?            About Neovim 열기/이전 버퍼로 돌아가기",
         "    Space Ctrl-s       설정 메뉴 열기",
         "    Space e            파일 트리 열기/닫기",
         "    Space ff           파일명 검색",
@@ -80,8 +185,7 @@ function M.open()
         "    Space dK           커서 위치/선택 영역 값 평가",
         "    Space dq           디버깅 세션 종료",
         "    :DapContinue       디버깅 시작/계속 실행",
-        "    :DapToggleBreakpoint",
-        "                       현재 줄 breakpoint 켜기/끄기",
+        "    :DapTBreakpoint    현재 줄 breakpoint 켜기/끄기",
         "    :DAPSettings       Debugger 설정 메뉴",
         "    :DAPMyList         DAP adapter 목록",
         "    :DAPMyInstall      DAP adapter 설치",
@@ -252,8 +356,6 @@ function M.open()
         "    노트 Esc           변경 없음은 바로 닫기, 변경 있음은 폐기 y 확인",
         "    이름 입력          값이 같으면 종료, 변경 시 y 확인, Esc로 취소",
         "    저장 위치          stdpath(state)/sessions/slot-N.json",
-        "    복원 범위          tab, split, buffer, cursor, terminal, tree, dashboard, breakpoint, 빈 창, floating slot",
-        "    터미널 한계        실행 중이던 프로세스는 복구하지 않고 새 shell을 다시 생성",
         "",
         "  대시보드 / About",
         "",
@@ -268,8 +370,10 @@ function M.open()
         "    Dashboard Q        blocker가 있을 때 강제 종료 확인",
         "    Dashboard Enter    blocker가 없을 때 Neovim 종료",
         "    Dashboard Esc      종료 확인 취소",
+        "    Space Esc          어디서든 Neovim 안전 종료 확인",
         "    Space q            직전 버퍼/터미널 복귀, 없으면 창 닫기 또는 종료",
-        "    About h / b / Esc  대시보드로 돌아가기",
+        "    About h / b / Esc  이전 버퍼로 돌아가기",
+        "    About Space ?      이전 버퍼로 돌아가기",
         "    About q / Q        About 닫기/강제 닫기",
         "    Space+버튼 키      전역 단축키가 없으면 대시보드 버튼 실행 방지",
         "",
@@ -358,44 +462,86 @@ function M.open()
         "",
     }
 
+    local section_targets
+    local toc_targets
+
+    lines, section_targets, toc_targets = organize_sections(lines)
+
     vim.api.nvim_buf_set_lines(0, 0, -1, false, lines)
     vim.bo.modifiable = false
     vim.bo.filetype = "help"
 
     vim.api.nvim_win_set_cursor(0, { 5, 2 })
 
+    local function jump_to_section(index)
+        local target = section_targets[index]
+
+        if target then
+            vim.api.nvim_win_set_cursor(0, { target, 2 })
+            vim.cmd("normal! zz")
+        end
+    end
+
     vim.keymap.set("n", "<CR>", function()
-        if vim.api.nvim_win_get_cursor(0)[1] == 5 then
-            back_to_dashboard()
+        local row = vim.api.nvim_win_get_cursor(0)[1]
+
+        if row == 5 then
+            back_to_previous_buffer()
+            return
+        end
+
+        local index = toc_targets[row]
+
+        if index then
+            jump_to_section(index)
         end
     end, {
         buffer = true,
         silent = true,
-        desc = "Back to dashboard",
+        desc = "Open selected About section",
     })
 
-    vim.keymap.set("n", "h", back_to_dashboard, {
+    for index = 0, #section_targets do
+        local shortcut = string.format("%02d", index)
+        local target_index = index
+
+        vim.keymap.set("n", shortcut, function()
+            jump_to_section(target_index)
+        end, {
+            buffer = true,
+            silent = true,
+            desc = "Open About section " .. shortcut,
+        })
+    end
+
+    vim.keymap.set("n", "h", back_to_previous_buffer, {
         buffer = true,
         silent = true,
-        desc = "Back to dashboard",
+        desc = "Back to previous buffer",
     })
 
-    vim.keymap.set("n", "b", back_to_dashboard, {
+    vim.keymap.set("n", "b", back_to_previous_buffer, {
         buffer = true,
         silent = true,
-        desc = "Back to dashboard",
+        desc = "Back to previous buffer",
     })
 
-    vim.keymap.set("n", "<Esc>", back_to_dashboard, {
+    vim.keymap.set("n", "<Esc>", back_to_previous_buffer, {
         buffer = true,
         silent = true,
-        desc = "Back to dashboard",
+        desc = "Back to previous buffer",
     })
 
-    vim.keymap.set("n", "<leader>h", back_to_dashboard, {
+    vim.keymap.set("n", "<leader>h", back_to_previous_buffer, {
         buffer = true,
         silent = true,
-        desc = "Back to dashboard",
+        desc = "Back to previous buffer",
+    })
+
+    vim.keymap.set("n", "<leader>?", back_to_previous_buffer, {
+        buffer = true,
+        silent = true,
+        desc = "Toggle About Neovim",
     })
 
     vim.keymap.set("n", "q", ":bd<CR>", {
@@ -409,6 +555,15 @@ function M.open()
         silent = true,
         desc = "Force close About Neovim",
     })
+end
+
+function M.toggle()
+    if vim.b.config_about_neovim then
+        back_to_previous_buffer()
+        return
+    end
+
+    M.open()
 end
 
 return M
