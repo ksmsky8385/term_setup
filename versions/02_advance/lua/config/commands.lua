@@ -18,6 +18,12 @@ end, {
     desc = "Open buffer settings",
 })
 
+vim.api.nvim_create_user_command("SettingsSidebar", function()
+    open_settings("sidebar")
+end, {
+    desc = "Open sidebar settings",
+})
+
 vim.api.nvim_create_user_command("SettingsTheme", function()
     open_settings("theme")
 end, {

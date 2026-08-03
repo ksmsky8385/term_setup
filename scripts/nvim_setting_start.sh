@@ -5,7 +5,9 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 VERSIONS_DIR="$ROOT_DIR/versions"
+BACK_TO_MENU_STATUS=10
 
+clear 2>/dev/null || true
 echo "NeoVim 환경설정 시작"
 echo
 
@@ -53,6 +55,9 @@ for dir in "${version_dirs[@]}"; do
     index=$((index + 1))
 done
 
+back_choice="$index"
+printf "%02d. 뒤로가기\n" "$back_choice"
+
 echo
 printf "> "
 read -r choice
@@ -63,6 +68,10 @@ if ! [[ "$choice" =~ ^[0-9]+$ ]]; then
 fi
 
 choice_num=$((10#$choice))
+
+if [ "$choice_num" -eq "$back_choice" ]; then
+    exit "$BACK_TO_MENU_STATUS"
+fi
 
 if [ "$choice_num" -eq 0 ]; then
     echo
@@ -97,7 +106,7 @@ if [ "$choice_num" -eq 0 ]; then
 fi
 
 if [ "$choice_num" -lt 1 ] || [ "$choice_num" -gt "${#version_dirs[@]}" ]; then
-    echo "Error: 0부터 ${#version_dirs[@]} 사이의 번호를 입력해야 합니다."
+    echo "Error: 표시된 메뉴 번호를 입력해야 합니다."
     exit 1
 fi
 

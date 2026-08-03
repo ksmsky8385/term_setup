@@ -5,6 +5,7 @@ set -o pipefail
 
 NVM_VERSION="v0.40.4"
 NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
+BACK_TO_MENU_STATUS=10
 
 load_nvm() {
     export NVM_DIR
@@ -217,6 +218,7 @@ show_agent_commands() {
 }
 
 delete_menu() {
+    clear 2>/dev/null || true
     echo "CLI Agent 삭제 메뉴"
     echo
     echo "00. 뒤로가기"
@@ -262,6 +264,7 @@ delete_menu() {
 main_menu() {
     ensure_user_local_npm
 
+    clear 2>/dev/null || true
     echo "CLI Agent 설정 스크립트"
     echo
 
@@ -272,6 +275,7 @@ main_menu() {
     echo "02. Codex CLI 설치"
     echo "03. GitHub Copilot CLI 설치"
     echo "04. 전체 설치 (Antigravity & Codex & GitHub Copilot)"
+    echo "05. 뒤로가기"
     echo
     printf "> "
     read -r choice
@@ -293,6 +297,9 @@ main_menu() {
             install_antigravity
             install_codex
             install_copilot
+            ;;
+        5 | 05)
+            exit "$BACK_TO_MENU_STATUS"
             ;;
         *)
             echo "Error: 잘못된 선택입니다."

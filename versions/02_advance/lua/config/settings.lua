@@ -52,6 +52,12 @@ local function open_main()
             end,
         },
         {
+            label = "Sidebar settings",
+            action = function()
+                M.open("sidebar")
+            end,
+        },
+        {
             label = "Change theme",
             action = function()
                 M.open("theme")
@@ -122,6 +128,67 @@ local function open_buffer()
             action = function()
                 end_of_buffer.toggle()
                 M.open("buffer")
+            end,
+        },
+    })
+end
+
+local function open_sidebar()
+    local sidebar_settings = require("config.sidebar_settings")
+
+    local function edit_width(name, label, suffix)
+        local range = sidebar_settings.range(name)
+
+        vim.ui.input({
+            prompt = string.format(
+                "%s (%d-%d%s): ",
+                label,
+                range.min,
+                range.max,
+                suffix
+            ),
+            default = tostring(sidebar_settings.get(name)),
+        }, function(input)
+            if input == nil then
+                M.open("sidebar")
+                return
+            end
+
+            if not sidebar_settings.set(name, input) then
+                vim.notify(
+                    string.format(
+                        "%s must be an integer from %d to %d.",
+                        label,
+                        range.min,
+                        range.max
+                    ),
+                    vim.log.levels.ERROR
+                )
+            end
+
+            M.open("sidebar")
+        end)
+    end
+
+    picker("Settings > Sidebar", {
+        {
+            label = "< Back",
+            action = open_main,
+        },
+        {
+            label = "File tree width: "
+                .. sidebar_settings.get("nvim_tree_width")
+                .. " columns",
+            action = function()
+                edit_width("nvim_tree_width", "File tree width", " columns")
+            end,
+        },
+        {
+            label = "Agentic width: "
+                .. sidebar_settings.get("agentic_width")
+                .. " columns",
+            action = function()
+                edit_width("agentic_width", "Agentic width", " columns")
             end,
         },
     })
@@ -478,6 +545,8 @@ end
 function M.open(menu)
     if menu == "buffer" then
         open_buffer()
+    elseif menu == "sidebar" then
+        open_sidebar()
     elseif menu == "theme" then
         open_theme()
     elseif menu == "treesitter" then

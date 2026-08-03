@@ -6,6 +6,7 @@ return {
 
     config = function()
         local buffers = require("config.buffers")
+        local sidebar_settings = require("config.sidebar_settings")
         local swap = require("config.swap")
         local tree_settings = require("config.tree_settings")
         local window_picker = require("config.window_picker")
@@ -642,7 +643,7 @@ return {
             end,
 
             view = {
-                width = 30,
+                width = sidebar_settings.get("nvim_tree_width"),
             },
 
             renderer = {

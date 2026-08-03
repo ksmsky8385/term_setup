@@ -1,0 +1,36 @@
+# LazyGit theme based on Visual Studio Code Dark Modern.
+gui:
+  border: rounded
+  theme:
+    activeBorderColor:
+      - "#0078d4"
+      - bold
+    inactiveBorderColor:
+      - "#3c3c3c"
+    searchingActiveBorderColor:
+      - "#75beff"
+      - bold
+    optionsTextColor:
+      - "#75beff"
+    selectedLineBgColor:
+      - "#04395e"
+    inactiveViewSelectedLineBgColor:
+      - "#2b2b2b"
+    cherryPickedCommitFgColor:
+      - "#1f1f1f"
+    cherryPickedCommitBgColor:
+      - "#4ec9b0"
+    markedBaseCommitFgColor:
+      - "#1f1f1f"
+    markedBaseCommitBgColor:
+      - "#cca700"
+    unstagedChangesColor:
+      - "#f14c4c"
+    defaultFgColor:
+      - "#cccccc"
+
+git:
+  pagers:
+    - name: "VS Code Dark Modern"
+      colorArg: always
+      pager: 'delta --dark --paging=never --true-color=always --syntax-theme="Visual Studio Dark+" --line-numbers --line-numbers-left-style="#858585" --line-numbers-right-style="#858585" --line-numbers-minus-style="#f14c4c" --line-numbers-plus-style="#89d185" --minus-style="syntax #4b1818" --minus-emph-style="syntax bold #7a2020" --plus-style="syntax #173d24" --plus-emph-style="syntax bold #1f6b35" --zero-style="syntax #1f1f1f"'

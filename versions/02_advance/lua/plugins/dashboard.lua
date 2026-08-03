@@ -20,7 +20,7 @@ return {
         local ascii_header = {
             "███╗   ██╗██╗   ██╗██╗███╗   ███╗",
             "████╗  ██║██║   ██║██║████╗ ████║",
-            "██╔██╗ ██║██║   ██║██║██╔████╔██║",
+            "██╔██╗ ██║██║   ██║██║██╔████╔██║ by. seunkang",
             "██║╚██╗██║╚██╗ ██╔╝██║██║╚██╔╝██║",
             "██║ ╚████║ ╚████╔╝ ██║██║ ╚═╝ ██║ " .. version_text,
             "╚═╝  ╚═══╝  ╚═══╝  ╚═╝╚═╝     ╚═╝",
@@ -365,6 +365,7 @@ return {
                         and filetype ~= "FloatingSlot"
                         and filetype ~= "NvimTree"
                         and filetype ~= "notify"
+                        and not filetype:match("^Agentic")
                     then
                         count = count + 1
                     end

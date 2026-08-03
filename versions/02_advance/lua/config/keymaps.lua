@@ -3,6 +3,9 @@ vim.keymap.set("t", "<Esc>", "<C-\\><C-n>", {
     silent = true,
 })
 
+vim.cmd([[nnoremenu <silent> 500.10 PopUp.Toggle\ Mode <Cmd>startinsert<CR>]])
+vim.cmd([[inoremenu <silent> 500.10 PopUp.Toggle\ Mode <Cmd>stopinsert<CR>]])
+
 local floating = require("config.floating")
 local empty_buffers = require("config.empty_buffers")
 
@@ -83,6 +86,10 @@ local ignored_save_filetypes = {
     lazygit = true,
     notify = true,
 }
+
+local function is_agentic_filetype(filetype)
+    return type(filetype) == "string" and filetype:match("^Agentic") ~= nil
+end
 
 local function restore_insert_mode(was_insert, buf)
     if not was_insert then
@@ -165,8 +172,9 @@ local function is_ignored_quit_window(win)
     end
 
     local buf = vim.api.nvim_win_get_buf(win)
+    local filetype = vim.bo[buf].filetype
 
-    return ignored_quit_filetypes[vim.bo[buf].filetype] == true
+    return ignored_quit_filetypes[filetype] == true or is_agentic_filetype(filetype)
 end
 
 local function close_target_window_count()
@@ -181,6 +189,7 @@ local function close_target_window_count()
                 filetype ~= "FloatingSlot"
                 and filetype ~= "NvimTree"
                 and filetype ~= "notify"
+                and not is_agentic_filetype(filetype)
             then
                 count = count + 1
             end
@@ -373,7 +382,7 @@ vim.keymap.set("n", "<leader>?", function()
         return
     end
 
-    require("config.about").toggle()
+    require("config.about").toggle_floating()
 end, {
     noremap = true,
     silent = true,
@@ -686,6 +695,11 @@ vim.keymap.set("n", "<C-Left>", "<C-w>h", { noremap = true, silent = true })
 vim.keymap.set("n", "<C-Down>", "<C-w>j", { noremap = true, silent = true })
 vim.keymap.set("n", "<C-Up>", "<C-w>k", { noremap = true, silent = true })
 vim.keymap.set("n", "<C-Right>", "<C-w>l", { noremap = true, silent = true })
+
+vim.keymap.set("i", "<C-Left>", "<Esc><C-w>h", { noremap = true, silent = true })
+vim.keymap.set("i", "<C-Down>", "<Esc><C-w>j", { noremap = true, silent = true })
+vim.keymap.set("i", "<C-Up>", "<Esc><C-w>k", { noremap = true, silent = true })
+vim.keymap.set("i", "<C-Right>", "<Esc><C-w>l", { noremap = true, silent = true })
 
 vim.keymap.set("n", "<A-Left>", ":vertical resize -1<CR>", { silent = true })
 vim.keymap.set("n", "<A-Right>", ":vertical resize +1<CR>", { silent = true })

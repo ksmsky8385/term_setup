@@ -3,6 +3,7 @@
 set -e
 
 ZSH_DIR="$HOME/.oh-my-zsh"
+BACK_TO_MENU_STATUS=10
 ZSH_CUSTOM="$ZSH_DIR/custom"
 PLUGIN_DIR="$ZSH_CUSTOM/plugins"
 THEME_DIR="$ZSH_CUSTOM/themes"
@@ -15,6 +16,7 @@ FASTFETCH_CONFIG_FILE="$FASTFETCH_CONFIG_DIR/config.jsonc"
 LOCAL_BIN_DIR="$HOME/.local/bin"
 FASTFETCH_BIN="$LOCAL_BIN_DIR/fastfetch"
 
+clear 2>/dev/null || true
 echo "zsh 플러그인 설정 스크립트"
 echo
 
@@ -306,6 +308,7 @@ set_default_shell_to_bash() {
 
 echo "00. 설치한 Oh My Zsh/플러그인 삭제"
 echo "01. Oh My Zsh/플러그인 설치"
+echo "02. 뒤로가기"
 echo
 printf "> "
 read -r choice
@@ -317,8 +320,11 @@ case "$choice" in
     1 | 01)
         install_plugins && set_default_shell_to_zsh
         ;;
+    2 | 02)
+        exit "$BACK_TO_MENU_STATUS"
+        ;;
     *)
-        echo "Error: 0 또는 1을 입력하세요."
+        echo "Error: 0부터 2 사이의 번호를 입력하세요."
         exit 1
         ;;
 esac

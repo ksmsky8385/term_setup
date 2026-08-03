@@ -136,6 +136,9 @@ return {
                     },
                     n = {
                         ["<Esc>"] = actions.close,
+                        ["<leader>?"] = function()
+                            require("config.about").toggle_floating()
+                        end,
                     },
                 },
             },

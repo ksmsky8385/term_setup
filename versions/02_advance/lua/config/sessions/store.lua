@@ -66,6 +66,22 @@ local function hide_floating_slots()
     end
 end
 
+local function hide_agentic_widgets()
+    local ok, registry = pcall(require, "agentic.session_registry")
+
+    if not ok or type(registry.sessions) ~= "table" then
+        return
+    end
+
+    for _, session in pairs(registry.sessions) do
+        local widget = type(session) == "table" and session.widget or nil
+
+        if widget and type(widget.hide) == "function" then
+            pcall(widget.hide, widget)
+        end
+    end
+end
+
 local function stop_debugger_for_session_save()
     local stopped = false
     local ok_dap, dap = pcall(require, "dap")
@@ -128,6 +144,7 @@ function M.save(slot, force, opts)
 
     stop_debugger_for_session_save()
     hide_floating_slots()
+    hide_agentic_widgets()
 
     local ok, layout = pcall(session_layout.snapshot)
 

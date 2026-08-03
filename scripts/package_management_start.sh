@@ -65,7 +65,14 @@ check_for_updates() {
     fi
 }
 
+wait_for_package_menu() {
+    echo
+    printf "Enter를 누르면 패키지 관리 메뉴로 돌아갑니다."
+    read -r
+}
+
 while true; do
+    clear 2>/dev/null || true
     echo
     echo "패키지 관리"
     echo "----------------------------------------------------"
@@ -78,7 +85,10 @@ while true; do
     read -r choice
 
     case "$choice" in
-        1) check_for_updates ;;
+        1)
+            check_for_updates
+            wait_for_package_menu
+            ;;
         2)
             if [ ! -f "$CACHE_SCRIPT" ]; then
                 echo "오류: 캐시 정리 스크립트를 찾을 수 없습니다: $CACHE_SCRIPT"
@@ -86,9 +96,13 @@ while true; do
                 [ -x "$CACHE_SCRIPT" ] || chmod +x "$CACHE_SCRIPT"
                 "$CACHE_SCRIPT"
             fi
+            wait_for_package_menu
             ;;
         3) exit 20 ;;
         4) exit 0 ;;
-        *) echo "1부터 4 사이의 번호를 입력하세요." ;;
+        *)
+            echo "1부터 4 사이의 번호를 입력하세요."
+            wait_for_package_menu
+            ;;
     esac
 done

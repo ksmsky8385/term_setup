@@ -1,28 +1,52 @@
 local M = {}
 local empty_buffers = require("config.empty_buffers")
+local floating_about = {
+    win = nil,
+    buf = nil,
+    previous_win = nil,
+    previous_slot_id = nil,
+    previous_mode = nil,
+    saved_view = nil,
+}
+local close_floating_about
+
+local function save_floating_about_view()
+    local win = floating_about.win
+
+    if not win or not vim.api.nvim_win_is_valid(win) then
+        return
+    end
+
+    local ok, view = pcall(vim.api.nvim_win_call, win, vim.fn.winsaveview)
+
+    if ok then
+        floating_about.saved_view = view
+    end
+end
 
 local section_definitions = {
     ["빠른 시작"] = { index = 0, title = "Quick Start", description = "자주 쓰는 기본 단축키" },
-    ["자동완성 / 스니펫"] = { index = 1, title = "Autocomplete & Snippets", description = "완성 후보와 스니펫 관리" },
-    ["버퍼"] = { index = 2, title = "Buffers", description = "버퍼 탐색, 이동 및 닫기" },
-    ["주석 및 42header"] = { index = 3, title = "Comments & 42 Header", description = "주석과 42 헤더 사용법" },
-    ["대시보드 / About"] = { index = 4, title = "Dashboard & About", description = "홈 화면과 도움말 화면" },
-    ["디버깅 / DAP"] = { index = 5, title = "Debugging & DAP", description = "중단점과 디버깅 실행" },
-    ["종료"] = { index = 6, title = "Exit", description = "창, 버퍼 및 Neovim 종료" },
-    ["파일 트리"] = { index = 7, title = "File Tree", description = "파일 트리 탐색과 조작" },
-    ["Git"] = { index = 8, title = "Git", description = "LazyGit과 변경 사항 관리" },
-    ["42 Header 설정"] = { index = 9, title = "Header Settings (42)", description = "42 헤더 사용자 정보 설정" },
-    ["LSP / 진단"] = { index = 10, title = "LSP & Diagnostics", description = "코드 탐색, 액션 및 진단" },
-    ["Markdown"] = { index = 11, title = "Markdown", description = "Markdown 브라우저 미리보기" },
-    ["Minimap"] = { index = 12, title = "Minimap", description = "미니맵과 스크롤바 제어" },
-    ["검색 / 탐색"] = { index = 13, title = "Search & Navigation", description = "파일, 문자열 및 도움말 검색" },
-    ["세션"] = { index = 14, title = "Sessions", description = "작업 세션 저장과 복원" },
-    ["설정 / 관리"] = { index = 15, title = "Settings & Management", description = "플러그인과 개발 도구 설정" },
-    ["탭"] = { index = 16, title = "Tabs", description = "탭 생성, 이동 및 닫기" },
-    ["터미널 / 플로팅"] = { index = 17, title = "Terminal & Floating Windows", description = "터미널과 플로팅 슬롯 관리" },
-    ["테마"] = { index = 18, title = "Themes", description = "색상 테마 선택과 저장" },
-    ["Tree-sitter"] = { index = 19, title = "Tree-sitter", description = "언어 파서 설치와 관리" },
-    ["창"] = { index = 20, title = "Windows", description = "창 선택, 분할 및 크기 조절" },
+    ["에이전트 / Agentic"] = { index = 1, title = "Agentic AI", description = "Agentic 조작 단축키" },
+    ["자동완성 / 스니펫"] = { index = 2, title = "Autocomplete & Snippets", description = "완성 후보와 스니펫 관리" },
+    ["버퍼"] = { index = 3, title = "Buffers", description = "버퍼 탐색, 이동 및 닫기" },
+    ["주석 및 42header"] = { index = 4, title = "Comments & 42 Header", description = "주석과 42 헤더 사용법" },
+    ["대시보드 / About"] = { index = 5, title = "Dashboard & About", description = "홈 화면과 도움말 화면" },
+    ["디버깅 / DAP"] = { index = 6, title = "Debugging & DAP", description = "중단점과 디버깅 실행" },
+    ["종료"] = { index = 7, title = "Exit", description = "창, 버퍼 및 Neovim 종료" },
+    ["파일 트리"] = { index = 8, title = "File Tree", description = "파일 트리 탐색과 조작" },
+    ["Git"] = { index = 9, title = "Git", description = "LazyGit과 변경 사항 관리" },
+    ["42 Header 설정"] = { index = 10, title = "Header Settings (42)", description = "42 헤더 사용자 정보 설정" },
+    ["LSP / 진단"] = { index = 11, title = "LSP & Diagnostics", description = "코드 탐색, 액션 및 진단" },
+    ["Markdown"] = { index = 12, title = "Markdown", description = "Markdown 브라우저 미리보기" },
+    ["Minimap"] = { index = 13, title = "Minimap", description = "미니맵과 스크롤바 제어" },
+    ["검색 / 탐색"] = { index = 14, title = "Search & Navigation", description = "파일, 문자열 및 도움말 검색" },
+    ["세션"] = { index = 15, title = "Sessions", description = "작업 세션 저장과 복원" },
+    ["설정 / 관리"] = { index = 16, title = "Settings & Management", description = "플러그인과 개발 도구 설정" },
+    ["탭"] = { index = 17, title = "Tabs", description = "탭 생성, 이동 및 닫기" },
+    ["터미널 / 플로팅"] = { index = 18, title = "Terminal & Floating Windows", description = "터미널과 플로팅 슬롯 관리" },
+    ["테마"] = { index = 19, title = "Themes", description = "색상 테마 선택과 저장" },
+    ["Tree-sitter"] = { index = 20, title = "Tree-sitter", description = "언어 파서 설치와 관리" },
+    ["창"] = { index = 21, title = "Windows", description = "창 선택, 분할 및 크기 조절" },
 }
 
 local function organize_sections(lines)
@@ -91,6 +115,12 @@ end
 
 local function back_to_previous_buffer()
     local about_buf = vim.api.nvim_get_current_buf()
+
+    if vim.b[about_buf].config_about_floating then
+        close_floating_about()
+        return
+    end
+
     local previous_buf = vim.b[about_buf].config_about_previous_buf
 
     if
@@ -108,19 +138,27 @@ local function back_to_previous_buffer()
     })
 end
 
-function M.open()
+function M.open(opts)
+    opts = opts or {}
+
     if vim.b.config_about_neovim then
         return
     end
 
-    local previous_buf = vim.api.nvim_get_current_buf()
+    local previous_buf = opts.previous_buf or vim.api.nvim_get_current_buf()
 
-    vim.cmd("enew")
+    if opts.buf then
+        vim.api.nvim_win_set_buf(0, opts.buf)
+    else
+        vim.cmd("enew")
+    end
+
     vim.bo.buftype = "nofile"
     vim.bo.bufhidden = "wipe"
     vim.bo.swapfile = false
     vim.bo.modifiable = true
     vim.b.config_about_neovim = true
+    vim.b.config_about_floating = opts.floating == true
     vim.b.config_about_previous_buf = previous_buf
     vim.wo.cursorline = true
 
@@ -151,6 +189,126 @@ function M.open()
         "    Space bb           버퍼 선택",
         "    Space q / Q        현재 버퍼 닫기/강제 닫기",
         "    Space Ctrl-q       현재 창 닫기",
+        "",
+        "    Telescope",
+        "",
+        "      Ctrl-n / Ctrl-p  다음/이전 검색 결과",
+        "      Enter            선택 결과 열기",
+        "      Insert Esc       normal mode로 전환",
+        "      Normal Esc       Telescope 닫기",
+        "      Ctrl-u / Ctrl-d  미리보기 위/아래 스크롤",
+        "",
+        "    Normal mode 단축키",
+        "",
+        "      h / j / k / l    왼쪽/아래/위/오른쪽으로 이동",
+        "      w / b / e        다음 단어/이전 단어/단어 끝으로 이동",
+        "      W / B / E        공백 기준 다음/이전 단어/단어 끝으로 이동",
+        "      0 / ^ / $        줄 처음/첫 글자/줄 끝으로 이동",
+        "      gg / G           파일 처음/끝으로 이동",
+        "      H / M / L        화면의 위/가운데/아래 줄로 이동",
+        "      { / }             이전/다음 문단으로 이동",
+        "      %                 대응하는 괄호로 이동",
+        "      f/F + 문자        줄 안에서 다음/이전 문자로 이동",
+        "      t/T + 문자        다음/이전 문자 바로 앞까지 이동",
+        "      ; / ,             마지막 f/F/t/T 이동 반복/역방향 반복",
+        "      Ctrl-o / Ctrl-i  이전/다음 점프 위치로 이동",
+        "      m+문자 / '+문자   위치 마크 저장/해당 마크로 이동",
+        "      숫자+동작         동작 반복(예: 5j, 3w, 2dd)",
+        "      i / a            커서 앞/뒤에서 insert mode 시작",
+        "      I / A            줄 처음/끝에서 insert mode 시작",
+        "      o / O            아래/위에 새 줄을 만들고 입력",
+        "      x / dd / D       글자/현재 줄/커서 뒤 삭제",
+        "      r / s            현재 글자 교체/삭제 후 입력",
+        "      cc / cw / ciw    현재 줄/단어 끝/현재 단어 변경",
+        "      diw / daw        현재 단어 내부/공백 포함 단어 삭제",
+        "      ci\" / ci(        따옴표/괄호 내부를 지우고 입력",
+        "      J                 다음 줄을 현재 줄에 연결",
+        "      >> / <<           현재 줄 들여쓰기/내어쓰기",
+        "      yy / p / P       현재 줄 복사/뒤에 붙이기/앞에 붙이기",
+        "      \"+동작           지정 레지스터 사용(예: \"ayy, \"ap)",
+        "      u / Ctrl-r       실행 취소/다시 실행",
+        "      .                 마지막 변경 반복",
+        "      q+문자 / @+문자   매크로 기록/실행, @@는 다시 실행",
+        "      /문자열           아래 방향 검색",
+        "      n / N             다음/이전 검색 결과",
+        "      * / #             커서 단어를 아래/위 방향 검색",
+        "      :                 명령줄 열기",
+        "      Ctrl-e / Ctrl-y  화면을 한 줄 아래/위로 스크롤",
+        "      Ctrl-d / Ctrl-u  화면을 반 페이지 아래/위로 스크롤",
+        "      Ctrl-f / Ctrl-b  화면을 한 페이지 아래/위로 스크롤",
+        "      zz / zt / zb     현재 줄을 화면 중앙/위/아래에 배치",
+        "      v / V / Ctrl-v   문자/줄/블록 visual mode 시작",
+        "",
+        "    Insert mode 단축키",
+        "",
+        "      Esc               normal mode로 돌아가기",
+        "      Ctrl-h            앞 글자 삭제",
+        "      Ctrl-w            앞 단어 삭제",
+        "      Ctrl-u            현재 입력 위치 앞부분 삭제",
+        "      Ctrl-o            normal 명령 하나 실행 후 입력 복귀",
+        "      Ctrl-r + 레지스터 레지스터 내용 삽입(Ctrl-r + \")",
+        "      Ctrl-n / Ctrl-p  다음/이전 자동완성 후보",
+        "      Ctrl-t / Ctrl-d  현재 줄 들여쓰기/내어쓰기",
+        "      Ctrl-a            직전에 입력한 텍스트 다시 삽입",
+        "      Ctrl-s            현재 파일 저장 후 입력 계속",
+        "",
+        "    Visual mode 단축키",
+        "",
+        "      v / V / Ctrl-v   문자/줄/블록 단위 선택",
+        "      o                 선택 영역 반대쪽 끝으로 이동",
+        "      iw / aw           현재 단어 내부/공백 포함 단어 선택",
+        "      i\" / a\"           따옴표 내부/따옴표 포함 영역 선택",
+        "      i( / a(           괄호 내부/괄호 포함 영역 선택",
+        "      y / d / c         선택 영역 복사/삭제/변경",
+        "      > / <             선택 영역 들여쓰기/내어쓰기",
+        "      =                 선택 영역 자동 들여쓰기",
+        "      J                 선택한 줄들을 한 줄로 연결",
+        "      Ctrl-v 후 I/A    여러 줄 앞/뒤를 동시에 편집",
+        "      :                 선택 영역에 Ex 명령 실행",
+        "      ~ / U / u         대소문자 반전/대문자/소문자 변환",
+        "      gv                마지막 선택 영역 다시 선택",
+        "      Esc               선택을 취소하고 normal mode로 복귀",
+        "",
+        "    Recording mode / 매크로",
+        "",
+        "      q+문자            해당 레지스터에 키 입력 기록 시작(예: qa)",
+        "      q                 매크로 기록 종료",
+        "      @+문자            해당 레지스터의 매크로 실행(예: @a)",
+        "      @@                마지막으로 실행한 매크로 다시 실행",
+        "      숫자+@+문자       매크로를 지정 횟수만큼 실행(예: 10@a)",
+        "      :reg 문자         저장된 매크로 내용 확인(예: :reg a)",
+        "      recording @문자   상태 표시 중에는 q를 눌러 기록 종료",
+        "",
+        "  에이전트 / Agentic",
+        "",
+        "    Space aa           우측 Agentic 사이드바 열기/닫기",
+        "    Space ac           현재 파일 또는 visual 선택 영역을 컨텍스트에 추가",
+        "    Space an           새 Agentic 대화 시작",
+        "    Space ar           Telescope에서 현재 프로젝트의 이전 대화 복원",
+        "    Space al           사이드바 위치를 오른쪽/아래로 전환",
+        "    Space as           ACP provider 전환",
+        "    Space ad / aD      현재 줄/현재 버퍼의 진단을 컨텍스트에 추가",
+        "    Space q            Agentic 창 숨기기(세션 유지)",
+        "    Space Q            현재 Agentic 세션 종료",
+        "    Prompt Enter       normal/insert mode에서 프롬프트 전송",
+        "    Prompt Shift-Enter insert mode에서 줄바꿈(터미널 키 구분 필요)",
+        "    Prompt Ctrl-s      normal/insert/visual mode에서 프롬프트 전송",
+        "    Prompt @파일명     프로젝트 파일을 찾아 컨텍스트로 참조",
+        "    Prompt /           provider slash command 목록 열기",
+        "    Shift-Tab          agent mode 전환(지원 provider에서만 동작)",
+        "    \\m                 모델 전환",
+        "    \\t                 reasoning effort 전환",
+        "    \\s                 provider 전환",
+        "    \\o                 Agentic 옵션 열기",
+        "    q                  Agentic 사이드바 닫기",
+        "    ]t / [t            다음/이전 tool call로 이동",
+        "    ]c / [c            diff preview의 다음/이전 hunk로 이동",
+        "    권한 요청          표시된 1~4 번호로 허용/거절 선택",
+        "    Codex ACP          npm install -g @agentclientprotocol/codex-acp",
+        "    Claude ACP         npm install -g @agentclientprotocol/claude-agent-acp",
+        "    Pi CLI             npm install -g @earendil-works/pi-coding-agent",
+        "    Pi ACP             npm install -g pi-acp",
+        "    provider 사용      CLI/ACP 설치 후 Neovim 재시작, Space as로 선택",
         "",
         "  LSP / 진단",
         "",
@@ -295,6 +453,7 @@ function M.open()
         "    Space wq           현재 창 닫기",
         "    Ctrl-h/j/k/l       왼쪽/아래/위/오른쪽 창 이동",
         "    Ctrl-Arrow         방향키로 창 이동",
+        "    Insert Ctrl-Arrow  normal mode로 전환 후 방향키로 창 이동",
         "    Alt-h/l            창 너비 1칸 줄이기/늘리기",
         "    Alt-k/j            창 높이 1칸 늘리기/줄이기",
         "    Alt-Arrow          방향키로 창 크기 1칸 조절",
@@ -393,8 +552,10 @@ function M.open()
         "",
         "  Markdown",
         "",
+        "    Space mr           현재 버퍼 Markdown 렌더링/원문 전환",
         "    Space mp           브라우저 Markdown 미리보기 열기/닫기",
-        "    동작 조건          Markdown 파일에서만 사용 가능",
+        "    기본 상태          Markdown 파일과 Agentic 채팅은 렌더링 모드",
+        "    동작 조건          mr은 Markdown/Agentic 채팅, mp는 Markdown 파일",
         "",
         "  Minimap",
         "",
@@ -413,6 +574,8 @@ function M.open()
         "    :Lazy              플러그인 관리 화면",
         "    :Lazy install      새 플러그인 설치",
         "    :Lazy sync         플러그인 설치/업데이트",
+        "    :SettingsSidebar   파일 트리/Agentic 사이드바 너비 설정",
+        "    사이드바 저장      stdpath(state)/sidebar-settings.json",
         "    :ThemePick         테마 선택 메뉴",
         "    줄번호 설정 위치   lua/config/options.lua",
         "    일반 줄번호        vim.opt.number = true",
@@ -544,16 +707,124 @@ function M.open()
         desc = "Toggle About Neovim",
     })
 
-    vim.keymap.set("n", "q", ":bd<CR>", {
+    vim.keymap.set("n", "q", function()
+        if vim.b.config_about_floating then
+            close_floating_about()
+        else
+            vim.cmd("bd")
+        end
+    end, {
         buffer = true,
         silent = true,
         desc = "Close About Neovim",
     })
 
-    vim.keymap.set("n", "Q", ":bd!<CR>", {
+    vim.keymap.set("n", "Q", function()
+        if vim.b.config_about_floating then
+            close_floating_about()
+        else
+            vim.cmd("bd!")
+        end
+    end, {
         buffer = true,
         silent = true,
         desc = "Force close About Neovim",
+    })
+end
+
+close_floating_about = function()
+    save_floating_about_view()
+
+    local win = floating_about.win
+    local buf = floating_about.buf
+    local previous_win = floating_about.previous_win
+    local previous_slot_id = floating_about.previous_slot_id
+    local previous_mode = floating_about.previous_mode
+
+    floating_about.win = nil
+    floating_about.buf = nil
+    floating_about.previous_win = nil
+    floating_about.previous_slot_id = nil
+    floating_about.previous_mode = nil
+
+    if win and vim.api.nvim_win_is_valid(win) then
+        pcall(vim.api.nvim_win_close, win, true)
+    end
+
+    if buf and vim.api.nvim_buf_is_valid(buf) then
+        pcall(vim.api.nvim_buf_delete, buf, { force = true })
+    end
+
+    if previous_slot_id ~= nil then
+        require("config.floating").open_slot(previous_slot_id)
+    elseif previous_win and vim.api.nvim_win_is_valid(previous_win) then
+        pcall(vim.api.nvim_set_current_win, previous_win)
+    end
+
+    if previous_mode and previous_mode:sub(1, 1) == "i" then
+        vim.schedule(function()
+            pcall(vim.cmd, "startinsert")
+        end)
+    end
+end
+
+function M.toggle_floating()
+    if floating_about.win and vim.api.nvim_win_is_valid(floating_about.win) then
+        close_floating_about()
+        return
+    end
+
+    local floating = require("config.floating")
+    local floating_window = require("config.floating.window")
+    local previous_win = vim.api.nvim_get_current_win()
+    local previous_buf = vim.api.nvim_get_current_buf()
+    local previous_slot_id = floating.window_slot_id(previous_win)
+    local previous_mode = vim.fn.mode()
+
+    if previous_mode:sub(1, 1) == "i" then
+        vim.cmd("stopinsert")
+    end
+
+    if previous_slot_id ~= nil then
+        floating.toggle(previous_slot_id)
+    end
+
+    local buf = vim.api.nvim_create_buf(false, true)
+    local win = floating_window.open_transient(buf, "About Neovim")
+
+    floating_about.win = win
+    floating_about.buf = buf
+    floating_about.previous_win = previous_win
+    floating_about.previous_slot_id = previous_slot_id
+    floating_about.previous_mode = previous_mode
+
+    M.open({
+        buf = buf,
+        previous_buf = previous_buf,
+        floating = true,
+    })
+
+    if floating_about.saved_view then
+        pcall(vim.api.nvim_win_call, win, function()
+            vim.fn.winrestview(floating_about.saved_view)
+        end)
+    end
+
+    vim.api.nvim_create_autocmd("WinLeave", {
+        buffer = buf,
+        callback = save_floating_about_view,
+        desc = "Remember the in-session About Neovim view",
+    })
+
+    vim.api.nvim_create_autocmd("WinClosed", {
+        pattern = tostring(win),
+        once = true,
+        callback = function()
+            if floating_about.win == win then
+                vim.schedule(close_floating_about)
+            end
+        end,
+        desc = "Restore the window hidden by floating About Neovim",
     })
 end
 

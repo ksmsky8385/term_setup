@@ -8,6 +8,7 @@ NVIM_SCRIPT="$SCRIPT_DIR/scripts/nvim_setting_start.sh"
 AGENT_SCRIPT="$SCRIPT_DIR/scripts/agent_setting_start.sh"
 BTOP_SCRIPT="$SCRIPT_DIR/scripts/btop_setting_start.sh"
 PACKAGE_SCRIPT="$SCRIPT_DIR/scripts/package_management_start.sh"
+BACK_TO_MENU_STATUS=10
 USER_PATH_LINE='export PATH="$HOME/.local/bin:$PATH"'
 LOCAL_FONT_DIR="$HOME/.local/share/fonts"
 LOCAL_D2CODING_DIR="$LOCAL_FONT_DIR/D2Coding"
@@ -166,6 +167,12 @@ show_menu() {
     echo "----------------------------------------------------"
 }
 
+wait_for_main_menu() {
+    echo
+    printf "Enter를 누르면 처음 메뉴로 돌아갑니다."
+    read -r
+}
+
 while true; do
     show_menu
     printf "선택: "
@@ -183,6 +190,7 @@ while true; do
             elif [ "$package_status" -ne 0 ]; then
                 echo "패키지 관리 중 오류가 발생했습니다."
             fi
+            wait_for_main_menu
             ;;
         1 | 2 | 3 | 4 | 5)
             if ask_yes_no "설정을 진행하겠습니까?"; then
@@ -190,7 +198,12 @@ while true; do
                     ensure_user_path
                 fi
 
-                if run_selected_setup "$choice"; then
+                setup_status=0
+                run_selected_setup "$choice" || setup_status=$?
+
+                if [ "$setup_status" -eq "$BACK_TO_MENU_STATUS" ]; then
+                    continue
+                elif [ "$setup_status" -eq 0 ]; then
                     echo
                     echo "선택한 설정이 완료되었습니다."
                 else
@@ -201,11 +214,7 @@ while true; do
                 echo "설정을 취소했습니다."
             fi
 
-            echo
-            if ask_yes_no "종료하시겠습니까?"; then
-                echo "프로그램을 종료합니다."
-                exit 0
-            fi
+            wait_for_main_menu
             ;;
         6)
             echo "프로그램을 종료합니다."
@@ -213,7 +222,7 @@ while true; do
             ;;
         *)
             echo "0부터 6 사이의 번호를 입력하세요."
-            sleep 1
+            wait_for_main_menu
             ;;
     esac
 done
