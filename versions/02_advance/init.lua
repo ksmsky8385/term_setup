@@ -1,6 +1,5 @@
 vim.opt.title = true
-vim.opt.titlestring =
-    "%{&buftype ==# 'terminal' ? fnamemodify(&shell, ':t') . ' - nvim' : (&buftype ==# '' && expand('%:t') !=# '' ? expand('%:t') . ' - nvim' : 'nvim')}"
+vim.opt.titlestring = "nvim"
 
 require("config.options")
 require("config.paths")

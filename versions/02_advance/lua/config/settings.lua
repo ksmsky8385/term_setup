@@ -191,6 +191,18 @@ local function open_sidebar()
                 edit_width("agentic_width", "Agentic width", " columns")
             end,
         },
+        {
+            label = "Agentic prompt height: "
+                .. sidebar_settings.get("agentic_height")
+                .. " lines",
+            action = function()
+                edit_width(
+                    "agentic_height",
+                    "Agentic prompt height",
+                    " lines"
+                )
+            end,
+        },
     })
 end
 

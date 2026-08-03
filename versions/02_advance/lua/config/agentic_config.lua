@@ -249,4 +249,80 @@ function M.show()
     end)
 end
 
+M.usage = {}
+
+local usage_save_path = vim.fn.stdpath("state") .. "/agentic-usage.json"
+local usage_values
+
+local function load_usage()
+    if usage_values then
+        return
+    end
+
+    usage_values = {}
+
+    if vim.fn.filereadable(usage_save_path) ~= 1 then
+        return
+    end
+
+    local ok, decoded = pcall(
+        vim.json.decode,
+        table.concat(vim.fn.readfile(usage_save_path), "\n")
+    )
+
+    if ok and type(decoded) == "table" then
+        usage_values = decoded
+    end
+end
+
+local function usage_cache_key(provider, session_id)
+    return string.format("%s:%s", provider or "unknown", session_id)
+end
+
+local function save_usage()
+    local dir = vim.fn.fnamemodify(usage_save_path, ":h")
+    vim.fn.mkdir(dir, "p")
+    vim.fn.writefile({ vim.json.encode(usage_values) }, usage_save_path)
+end
+
+function M.usage.get(provider, session_id)
+    if not session_id or session_id == "" then
+        return nil
+    end
+
+    load_usage()
+    local usage = usage_values[usage_cache_key(provider, session_id)]
+
+    if
+        type(usage) ~= "table"
+        or type(usage.used) ~= "number"
+        or type(usage.size) ~= "number"
+    then
+        return nil
+    end
+
+    return {
+        used = usage.used,
+        size = usage.size,
+    }
+end
+
+function M.usage.set(provider, session_id, used, size)
+    if
+        not session_id
+        or session_id == ""
+        or type(used) ~= "number"
+        or type(size) ~= "number"
+    then
+        return
+    end
+
+    load_usage()
+    usage_values[usage_cache_key(provider, session_id)] = {
+        used = used,
+        size = size,
+    }
+    save_usage()
+end
+
 return M

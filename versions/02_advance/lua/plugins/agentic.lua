@@ -35,83 +35,114 @@ local function apply_agentic_prompt_highlights()
         "fg",
         highlight_color("Identifier", "fg", 0x75beff)
     )
-    local prompt_bg = lighten(normal_bg, 0.07)
+    local input_line_bg = lighten(lighten(normal_bg, 0.07), 0.045)
 
     vim.api.nvim_set_hl(0, "AgenticPromptNormal", {
         fg = normal_fg,
-        bg = prompt_bg,
+        bg = normal_bg,
     })
     vim.api.nvim_set_hl(0, "AgenticPromptCursorLine", {
         fg = normal_fg,
-        bg = lighten(prompt_bg, 0.045),
+        bg = normal_bg,
     })
     vim.api.nvim_set_hl(0, "AgenticPromptMarker", {
         fg = accent,
-        bg = prompt_bg,
+        bg = normal_bg,
         bold = true,
+    })
+    vim.api.nvim_set_hl(0, "AgenticTitle", {
+        fg = normal_fg,
+        bg = input_line_bg,
+        bold = false,
     })
 end
 
-local function agentic_chat_header(parts, session_state)
-    if not session_state then
-        return parts.title
+local function agentic_session_cwd(session_state)
+    local cwd = session_state and session_state._config_session_cwd
+        or vim.g.current_workspace_root
+        or vim.uv.cwd()
+
+    return cwd and vim.fn.fnamemodify(cwd, ":~") or ""
+end
+
+local function agentic_cwd_header(_parts, session_state)
+    return agentic_session_cwd(session_state)
+end
+
+local function track_agentic_session_cwd()
+    local SessionManager = require("agentic.session_manager")
+    local usage_store = require("config.agentic_config").usage
+
+    if SessionManager._config_tracks_session_cwd then
+        return
     end
 
-    local model = session_state:get_model_name() or "unknown"
-    local thought_level = session_state:get_thought_level_name()
-        or session_state:get_thought_level_id()
+    local original_new_session = SessionManager.new_session
+    local original_load_acp_session = SessionManager.load_acp_session
+    local original_on_session_update = SessionManager._on_session_update
 
-    if thought_level and thought_level ~= "" then
-        model = string.format("%s (%s)", model, thought_level)
+    local function provider_name(session)
+        return session.agent
+            and session.agent.provider_config
+            and session.agent.provider_config.name
+            or "unknown"
     end
 
-    local segments = {
-        session_state:get_provider_name(),
-        model,
-        session_state:get_mode_name(),
-    }
-    local visible_segments = {}
-
-    for _, segment in ipairs(segments) do
-        if segment and segment ~= "" then
-            visible_segments[#visible_segments + 1] = segment
+    local function remember_cwd(session)
+        if session.session_state then
+            session.session_state._config_session_cwd = vim.fn.getcwd()
         end
     end
 
-    local header = string.format(
-        "%s | %s",
-        parts.title,
-        table.concat(visible_segments, " - ")
+    SessionManager.new_session = function(self, opts)
+        remember_cwd(self)
+        return original_new_session(self, opts)
+    end
+
+    SessionManager.load_acp_session = function(
+        self,
+        session_id,
+        title,
+        timestamp
     )
-    local used = session_state:get_context_used()
-    local size = session_state:get_context_size()
+        remember_cwd(self)
+        local result = original_load_acp_session(
+            self,
+            session_id,
+            title,
+            timestamp
+        )
+        local usage = usage_store.get(provider_name(self), session_id)
 
-    if used ~= nil and size ~= nil then
-        header = header .. string.format(" (%s/%s)", used, size)
+        if usage and self.session_state then
+            self.session_state:set_usage(usage)
+            self.widget:schedule_header_refresh()
+        end
+
+        return result
     end
 
-    local cost = session_state:get_cost_amount_raw()
-    if cost ~= nil and cost ~= 0 then
-        local amount = session_state:get_cost_amount() or ""
-        local currency = session_state:get_cost_currency()
-        header = header
-            .. " "
-            .. (currency and (currency .. " ") or "")
-            .. amount
+    SessionManager._on_session_update = function(self, update)
+        original_on_session_update(self, update)
+
+        if update.sessionUpdate ~= "usage_update" then
+            return
+        end
+
+        local active_session_id =
+            self.session_id or self._restoring_session_id
+        local used = self.session_state:get_context_used_raw()
+        local size = self.session_state:get_context_size_raw()
+
+        usage_store.set(
+            provider_name(self),
+            active_session_id,
+            used,
+            size
+        )
     end
 
-    return header
-end
-
-local function agentic_input_header(parts, _session_state)
-    local segments = { parts.title }
-
-    local cwd = vim.g.current_workspace_root or vim.uv.cwd()
-    if cwd and cwd ~= "" then
-        segments[#segments + 1] = vim.fn.fnamemodify(cwd, ":~")
-    end
-
-    return table.concat(segments, " | ")
+    SessionManager._config_tracks_session_cwd = true
 end
 
 local function focus_regular_editor_window()
@@ -182,7 +213,6 @@ local function refresh_headers_after_show()
     end
 
     local original_show = ChatWidget.show
-
     ChatWidget.show = function(self, opts)
         local should_focus_prompt = opts == nil or opts.focus_prompt ~= false
 
@@ -219,6 +249,25 @@ return {
         vim.api.nvim_create_autocmd("ColorScheme", {
             callback = apply_agentic_prompt_highlights,
             desc = "Adapt the Agentic prompt panel to the active colorscheme",
+        })
+
+        vim.api.nvim_create_autocmd("DirChanged", {
+            callback = function()
+                local ok, registry = pcall(
+                    require,
+                    "agentic.session_registry"
+                )
+                if not ok then
+                    return
+                end
+
+                for _, session in pairs(registry.sessions) do
+                    if session and session.widget then
+                        session.widget:schedule_header_refresh()
+                    end
+                end
+            end,
+            desc = "Refresh the Agentic prompt cwd header",
         })
 
         vim.api.nvim_create_autocmd("FileType", {
@@ -295,7 +344,8 @@ return {
                 buffer_name = "Agentic",
             },
             input = {
-                buffer_name = "Prompt",
+                buffer_name = "󰦨 Prompt",
+                height = sidebar_settings.get("agentic_height"),
                 win_opts = {
                     cursorline = true,
                     signcolumn = "yes:1",
@@ -328,8 +378,10 @@ return {
             center_on_navigate_hunks = true,
         },
         headers = {
-            chat = agentic_chat_header,
-            input = agentic_input_header,
+            chat = function()
+                return ""
+            end,
+            input = agentic_cwd_header,
         },
         keymaps = {
             prompt = {
@@ -348,8 +400,10 @@ return {
     },
     config = function(_, opts)
         allow_dashboard_as_fallback()
+        track_agentic_session_cwd()
         refresh_headers_after_show()
         require("agentic").setup(opts)
+        apply_agentic_prompt_highlights()
     end,
     keys = {
         {
@@ -383,7 +437,7 @@ return {
         {
             "<leader>ar",
             function()
-                require("config.agentic_session_restore").show()
+                require("config.agentic_config").show()
             end,
             mode = { "n", "v" },
             desc = "Restore Agentic session",
