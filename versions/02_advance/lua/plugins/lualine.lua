@@ -45,6 +45,25 @@ return {
             return is_agentic_chat() or is_agentic_input()
         end
 
+        local function special_status_name()
+            local win = vim.g.statusline_winid or vim.api.nvim_get_current_win()
+            local buf = vim.api.nvim_win_get_buf(win)
+
+            if vim.bo[buf].filetype == "alpha" then
+                return "Dashboard"
+            end
+
+            if vim.b[buf].config_about_neovim then
+                return "About Neovim"
+            end
+
+            return ""
+        end
+
+        local function is_special_status_buffer()
+            return special_status_name() ~= ""
+        end
+
         local function agentic_usage(state)
             local used = state and state:get_context_used()
             local size = state and state:get_context_size()
@@ -122,7 +141,7 @@ return {
 
             local label = window_label()
 
-            return label ~= "" and (name .. " " .. label) or name
+            return label ~= "" and (label .. " " .. name) or name
         end
 
         local function agentic_status_color()
@@ -148,6 +167,7 @@ return {
         local function is_regular_status_buffer()
             return not terminal.is_status_terminal()
                 and not is_agentic_status_buffer()
+                and not is_special_status_buffer()
         end
 
         require("lualine").setup({
@@ -170,6 +190,10 @@ return {
                             return not is_agentic_status_buffer()
                         end,
                         on_click = window_picker.focus_statusline_window,
+                    },
+                    {
+                        special_status_name,
+                        cond = is_special_status_buffer,
                     },
                     terminal.status_name,
                     {
@@ -194,6 +218,10 @@ return {
                             return not is_agentic_status_buffer()
                         end,
                         on_click = window_picker.focus_statusline_window,
+                    },
+                    {
+                        special_status_name,
+                        cond = is_special_status_buffer,
                     },
                     terminal.status_name,
                     {
