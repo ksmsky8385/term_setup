@@ -349,7 +349,7 @@ return {
                 win_opts = {
                     cursorline = true,
                     signcolumn = "yes:1",
-                    statuscolumn = "%#AgenticPromptMarker#%{v:lnum == 1 ? '> ' : '  '}",
+                    statuscolumn = "%#AgenticPromptMarker#%{v:lnum == 1 && v:virtnum == 0 ? '> ' : '  '}",
                     winhighlight = table.concat({
                         "Normal:AgenticPromptNormal",
                         "NormalNC:AgenticPromptNormal",
