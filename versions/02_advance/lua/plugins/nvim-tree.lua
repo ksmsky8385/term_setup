@@ -539,6 +539,22 @@ return {
 
                 vim.keymap.set(
                     "n",
+                    "c",
+                    function()
+                        local node = api.tree.get_node_under_cursor()
+
+                        if node and not node.parent then
+                            vim.cmd("WorkspacePick")
+                            return
+                        end
+
+                        api.fs.copy.node()
+                    end,
+                    opts("Change workspace at tree root or copy node")
+                )
+
+                vim.keymap.set(
+                    "n",
                     "<LeftMouse>",
                     focus_mouse_node,
                     opts("Select node")
