@@ -1,7 +1,0 @@
-네오빔 하위버전 패스설정 (.zshrc)
-
-export PATH="$HOME/opt/nvim-0.11.7/bin:$PATH"
-
-termux 스토리지 권한 설정
-
-termux-setup-storage
