@@ -55,7 +55,10 @@ check_for_updates() {
 
     echo
     echo "새로운 커밋 $commit_count개가 있습니다."
-    git -C "$PACKAGE_ROOT" log --oneline --decorate "HEAD..$upstream"
+    echo "----------------------------------------------------"
+    git -C "$PACKAGE_ROOT" --no-pager log \
+        --oneline --decorate "HEAD..$upstream"
+    echo "----------------------------------------------------"
     echo
 
     if ask_yes_no "업데이트가 확인되었습니다. 업데이트 하시겠습니까?"; then
