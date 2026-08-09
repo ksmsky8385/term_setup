@@ -8,4 +8,4 @@ termux 스토리지 권한 설정
 
 termux 코덱스 설치 명령어
 
-	npm install -g @mmmbuto/codex-cli-termux@lastest
+	npm install -g @mmmbuto/codex-cli-termux@latest
