@@ -180,6 +180,13 @@ local function add_slot_key(char_map, slot_id, target)
     end
 end
 
+local function is_agentic_window(win)
+    local buf = vim.api.nvim_win_get_buf(win)
+    local filetype = vim.bo[buf].filetype
+
+    return type(filetype) == "string" and filetype:match("^Agentic") ~= nil
+end
+
 local function is_excluded(win, exclude)
     if not vim.api.nvim_win_is_valid(win) then
         return true
@@ -188,6 +195,12 @@ local function is_excluded(win, exclude)
     local config = vim.api.nvim_win_get_config(win)
 
     if not config.focusable or config.hide or config.external then
+        return true
+    end
+
+    -- Agentic owns these windows as a single sidebar widget.  Editor window
+    -- actions must not replace, split, relabel, or otherwise target them.
+    if is_agentic_window(win) then
         return true
     end
 
@@ -305,6 +318,10 @@ local function focusable_window(win)
     local config = vim.api.nvim_win_get_config(win)
 
     if not config.focusable or config.hide or config.external then
+        return false
+    end
+
+    if is_agentic_window(win) then
         return false
     end
 

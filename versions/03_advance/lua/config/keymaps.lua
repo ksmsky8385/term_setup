@@ -3,11 +3,29 @@ vim.keymap.set("t", "<Esc>", "<C-\\><C-n>", {
     silent = true,
 })
 
+vim.keymap.set("t", "<C-[>", "<C-\\><C-n>", {
+    noremap = true,
+    silent = true,
+})
+
 vim.cmd([[nnoremenu <silent> 500.10 PopUp.Toggle\ Mode <Cmd>startinsert<CR>]])
 vim.cmd([[inoremenu <silent> 500.10 PopUp.Toggle\ Mode <Cmd>stopinsert<CR>]])
 
 local floating = require("config.floating")
 local empty_buffers = require("config.empty_buffers")
+
+local function is_agentic_filetype(filetype)
+    return type(filetype) == "string" and filetype:match("^Agentic") ~= nil
+end
+
+local function reject_agentic_window_action()
+    if not is_agentic_filetype(vim.bo.filetype) then
+        return false
+    end
+
+    vim.notify("Agentic windows are separate from editor window actions.", vim.log.levels.INFO)
+    return true
+end
 
 local function is_nvim_tree()
     return vim.bo.filetype == "NvimTree"
@@ -19,7 +37,7 @@ local function empty_unlisted_buffer()
 end
 
 local function vertical_split_or_empty()
-    if floating.reject_window_action() then
+    if floating.reject_window_action() or reject_agentic_window_action() then
         return
     end
 
@@ -32,7 +50,7 @@ local function vertical_split_or_empty()
 end
 
 local function horizontal_split_or_empty()
-    if floating.reject_window_action() then
+    if floating.reject_window_action() or reject_agentic_window_action() then
         return
     end
 
@@ -52,7 +70,7 @@ local function open_dashboard_home()
 end
 
 local function only_non_tree_window()
-    if is_nvim_tree() then
+    if is_nvim_tree() or reject_agentic_window_action() then
         return
     end
 
@@ -86,10 +104,6 @@ local ignored_save_filetypes = {
     lazygit = true,
     notify = true,
 }
-
-local function is_agentic_filetype(filetype)
-    return type(filetype) == "string" and filetype:match("^Agentic") ~= nil
-end
 
 local function restore_insert_mode(was_insert, buf)
     if not was_insert then
