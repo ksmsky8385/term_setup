@@ -574,7 +574,7 @@ function M.open(opts)
         "    :Lazy              플러그인 관리 화면",
         "    :Lazy install      새 플러그인 설치",
         "    :Lazy sync         플러그인 설치/업데이트",
-        "    :SettingsSidebar   파일 트리/Agentic 사이드바 너비 설정",
+        "    :SettingsSidebar   파일 트리/Agentic 위치와 크기 설정",
         "    사이드바 저장      stdpath(state)/sidebar-settings.json",
         "    :ThemePick         테마 선택 메뉴",
         "    줄번호 설정 위치   lua/config/options.lua",

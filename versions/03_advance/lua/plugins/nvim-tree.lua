@@ -659,7 +659,9 @@ return {
             end,
 
             view = {
+                side = sidebar_settings.get("nvim_tree_position"),
                 width = sidebar_settings.get("nvim_tree_width"),
+                preserve_window_proportions = true,
             },
 
             renderer = {

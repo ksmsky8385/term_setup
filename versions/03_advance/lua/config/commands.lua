@@ -184,4 +184,18 @@ vim.api.nvim_create_user_command("TreeToggle", function()
     api.tree.toggle({
         focus = true,
     })
+
+    vim.schedule(function()
+        local sidebar_settings = require("config.sidebar_settings")
+
+        vim.cmd("wincmd =")
+
+        if api.tree.is_visible() then
+            api.tree.resize({
+                absolute = sidebar_settings.get("nvim_tree_width"),
+            })
+        end
+
+        sidebar_settings.restore_agentic_width()
+    end)
 end, {})

@@ -215,6 +215,40 @@ local function refresh_headers_after_show()
     local original_show = ChatWidget.show
     ChatWidget.show = function(self, opts)
         local should_focus_prompt = opts == nil or opts.focus_prompt ~= false
+        local ok_open, is_open = pcall(self.is_open, self)
+
+        if not ok_open or not is_open then
+            local position = self.current_position
+            local anchor
+            local anchor_edge
+
+            if position == "left" or position == "right" then
+                for _, win in ipairs(vim.api.nvim_tabpage_list_wins(self.tab_page_id)) do
+                    if
+                        vim.api.nvim_win_is_valid(win)
+                        and vim.api.nvim_win_get_config(win).relative == ""
+                    then
+                        local win_position = vim.api.nvim_win_get_position(win)
+                        local edge = position == "left"
+                                and win_position[2]
+                            or win_position[2] + vim.api.nvim_win_get_width(win)
+
+                        if
+                            anchor_edge == nil
+                            or (position == "left" and edge < anchor_edge)
+                            or (position == "right" and edge > anchor_edge)
+                        then
+                            anchor = win
+                            anchor_edge = edge
+                        end
+                    end
+                end
+            end
+
+            if anchor then
+                pcall(vim.api.nvim_set_current_win, anchor)
+            end
+        end
 
         original_show(self, opts)
 
@@ -337,7 +371,7 @@ return {
     opts = {
         provider = "codex-acp",
         windows = {
-            position = "right",
+            position = sidebar_settings.get("agentic_position"),
             width = sidebar_settings.get("agentic_width"),
             height = "30%",
             chat = {
@@ -396,6 +430,9 @@ return {
                     },
                 },
             },
+        },
+        settings = {
+            move_cursor_to_chat_on_submit = false,
         },
     },
     config = function(_, opts)

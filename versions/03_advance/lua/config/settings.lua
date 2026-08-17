@@ -176,6 +176,28 @@ local function open_sidebar()
             action = open_main,
         },
         {
+            label = "Tree: " .. sidebar_settings.get("nvim_tree_position"),
+            action = function()
+                local position = sidebar_settings.get("nvim_tree_position")
+                sidebar_settings.set(
+                    "nvim_tree_position",
+                    position == "left" and "right" or "left"
+                )
+                M.open("sidebar")
+            end,
+        },
+        {
+            label = "Agentic: " .. sidebar_settings.get("agentic_position"),
+            action = function()
+                local position = sidebar_settings.get("agentic_position")
+                sidebar_settings.set(
+                    "agentic_position",
+                    position == "left" and "right" or "left"
+                )
+                M.open("sidebar")
+            end,
+        },
+        {
             label = "File tree width: "
                 .. sidebar_settings.get("nvim_tree_width")
                 .. " columns",
