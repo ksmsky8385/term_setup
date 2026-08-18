@@ -364,7 +364,7 @@ return {
                         desc = "Enter insert mode in Agentic prompt",
                     })
 
-                    vim.keymap.set("i", "<S-CR>", "<CR>", {
+                    vim.keymap.set("i", "<M-CR>", "<CR>", {
                         buffer = args.buf,
                         silent = true,
                         desc = "Insert newline in Agentic prompt",
