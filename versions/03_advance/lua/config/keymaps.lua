@@ -432,6 +432,13 @@ vim.api.nvim_create_autocmd("TermOpen", {
                 vim.api.nvim_buf_is_valid(args.buf)
                 and vim.bo[args.buf].buftype == "terminal"
             then
+                vim.keymap.set("n", "<leader><leader>", "<Cmd>startinsert<CR>", {
+                    buffer = args.buf,
+                    noremap = true,
+                    silent = true,
+                    desc = "Enter terminal mode",
+                })
+
                 vim.keymap.set("n", "<leader>tc", terminal.clear_current_terminal, {
                     buffer = args.buf,
                     noremap = true,
