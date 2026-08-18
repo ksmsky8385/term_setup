@@ -722,6 +722,11 @@ vim.keymap.set("i", "<C-Down>", "<Esc><C-w>j", { noremap = true, silent = true }
 vim.keymap.set("i", "<C-Up>", "<Esc><C-w>k", { noremap = true, silent = true })
 vim.keymap.set("i", "<C-Right>", "<Esc><C-w>l", { noremap = true, silent = true })
 
+vim.keymap.set("t", "<C-Left>", "<C-\\><C-n><C-w>h", { noremap = true, silent = true })
+vim.keymap.set("t", "<C-Down>", "<C-\\><C-n><C-w>j", { noremap = true, silent = true })
+vim.keymap.set("t", "<C-Up>", "<C-\\><C-n><C-w>k", { noremap = true, silent = true })
+vim.keymap.set("t", "<C-Right>", "<C-\\><C-n><C-w>l", { noremap = true, silent = true })
+
 vim.keymap.set("n", "<A-Left>", ":vertical resize -1<CR>", { silent = true })
 vim.keymap.set("n", "<A-Right>", ":vertical resize +1<CR>", { silent = true })
 vim.keymap.set("n", "<A-Up>", ":resize +1<CR>", { silent = true })
