@@ -358,6 +358,12 @@ return {
                 })
 
                 if vim.bo[args.buf].filetype == "AgenticInput" then
+                    vim.keymap.set("n", leader .. leader, "<Cmd>startinsert<CR>", {
+                        buffer = args.buf,
+                        silent = true,
+                        desc = "Enter insert mode in Agentic prompt",
+                    })
+
                     vim.keymap.set("i", "<S-CR>", "<CR>", {
                         buffer = args.buf,
                         silent = true,
@@ -410,6 +416,11 @@ return {
             enabled = true,
             layout = "split",
             center_on_navigate_hunks = true,
+        },
+        -- Follow streaming output only while the chat cursor is near the bottom.
+        -- Scrolling up keeps the current reading position stable.
+        auto_scroll = {
+            threshold = 1,
         },
         headers = {
             chat = function()
