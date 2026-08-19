@@ -9,6 +9,14 @@ return {
         local alpha = require("alpha")
         local dashboard = require("alpha.themes.dashboard")
 
+        -- Alpha keeps closed floating window ids in its per-buffer state and
+        -- its built-in WinResized callback then indexes those stale ids.
+        -- Our ConfigDashboardResize callback below validates every window and
+        -- redraws each dashboard in its actual window, so disable the unsafe
+        -- built-in resize callback.
+        dashboard.opts.opts = dashboard.opts.opts or {}
+        dashboard.opts.opts.redraw_on_resize = false
+
         local version = vim.version()
         local version_text = string.format(
             "ver. %d.%d.%d",
@@ -456,23 +464,51 @@ return {
         end
 
         local function redraw_dashboard()
+            local win = vim.api.nvim_get_current_win()
             dashboard.section.header.val = make_header()
-            alpha.setup(dashboard.opts)
-            pcall(vim.cmd, "AlphaRedraw")
+            pcall(alpha.redraw)
+            pcall(vim.cmd, "redraw!")
+            vim.schedule(function()
+                if
+                    vim.api.nvim_win_is_valid(win)
+                    and is_dashboard_buffer(vim.api.nvim_win_get_buf(win))
+                then
+                    pcall(vim.api.nvim_win_call, win, focus_first_dashboard_button)
+                end
+            end)
         end
+
+        local function redraw_all_dashboards()
+            for _, win in ipairs(vim.api.nvim_list_wins()) do
+                if
+                    vim.api.nvim_win_is_valid(win)
+                    and is_dashboard_buffer(vim.api.nvim_win_get_buf(win))
+                then
+                    pcall(vim.api.nvim_win_call, win, function()
+                        alpha.redraw()
+                    end)
+                end
+            end
+        end
+
+        vim.api.nvim_create_autocmd({ "WinResized", "VimResized" }, {
+            group = vim.api.nvim_create_augroup("ConfigDashboardResize", { clear = true }),
+            callback = function()
+                vim.schedule(redraw_all_dashboards)
+            end,
+        })
 
         vim.api.nvim_create_autocmd("User", {
             pattern = "WorkspaceChanged",
             callback = function()
                 dashboard.section.header.val = make_header()
-                alpha.setup(dashboard.opts)
 
                 for _, win in ipairs(vim.api.nvim_list_wins()) do
                     local buf = vim.api.nvim_win_get_buf(win)
 
                     if is_dashboard_buffer(buf) then
                         pcall(vim.api.nvim_win_call, win, function()
-                            vim.cmd("AlphaRedraw")
+                            alpha.redraw()
                         end)
                     end
                 end
@@ -538,7 +574,6 @@ return {
             end
 
             dashboard.section.header.val = make_header()
-            alpha.setup(dashboard.opts)
             vim.cmd("Alpha")
 
             local ok_empty, empty_buffers = pcall(require, "config.empty_buffers")

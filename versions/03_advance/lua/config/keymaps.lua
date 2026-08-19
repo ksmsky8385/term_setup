@@ -37,6 +37,7 @@ local function empty_unlisted_buffer()
 end
 
 local function vertical_split_or_empty()
+    if floating.split("vertical") then return end
     if floating.reject_window_action() or reject_agentic_window_action() then
         return
     end
@@ -50,6 +51,7 @@ local function vertical_split_or_empty()
 end
 
 local function horizontal_split_or_empty()
+    if floating.split("horizontal") then return end
     if floating.reject_window_action() or reject_agentic_window_action() then
         return
     end
@@ -524,7 +526,9 @@ vim.keymap.set("n", "<leader><C-q>", ":q<CR>", {
     desc = "Close current window",
 })
 
-vim.keymap.set("n", "<leader><Esc>", "<Cmd>DashboardQuit<CR>", {
+vim.keymap.set("n", "<leader><Esc>", function()
+    if not floating.reset_layout() then vim.cmd("DashboardQuit") end
+end, {
     noremap = true,
     silent = true,
     desc = "Safely quit Neovim",
@@ -700,6 +704,7 @@ vim.keymap.set("n", "<leader>wo", only_non_tree_window, {
 })
 
 vim.keymap.set("n", "<leader>wq", function()
+    if floating.close_current(false) then return end
     close_current_window_or_dashboard(vim.api.nvim_get_current_win())
 end, {
     noremap = true,
@@ -707,32 +712,56 @@ end, {
     desc = "Close current window",
 })
 
-vim.keymap.set("n", "<C-h>", "<C-w>h", { noremap = true, silent = true })
-vim.keymap.set("n", "<C-j>", "<C-w>j", { noremap = true, silent = true })
-vim.keymap.set("n", "<C-k>", "<C-w>k", { noremap = true, silent = true })
-vim.keymap.set("n", "<C-l>", "<C-w>l", { noremap = true, silent = true })
+local function focus_or_float(direction, normal)
+    return function()
+        if not floating.focus(direction) then vim.cmd("wincmd " .. normal) end
+    end
+end
 
-vim.keymap.set("n", "<C-Left>", "<C-w>h", { noremap = true, silent = true })
-vim.keymap.set("n", "<C-Down>", "<C-w>j", { noremap = true, silent = true })
-vim.keymap.set("n", "<C-Up>", "<C-w>k", { noremap = true, silent = true })
-vim.keymap.set("n", "<C-Right>", "<C-w>l", { noremap = true, silent = true })
+vim.keymap.set("n", "<C-h>", focus_or_float("left", "h"), { noremap = true, silent = true })
+vim.keymap.set("n", "<C-j>", focus_or_float("down", "j"), { noremap = true, silent = true })
+vim.keymap.set("n", "<C-k>", focus_or_float("up", "k"), { noremap = true, silent = true })
+vim.keymap.set("n", "<C-l>", focus_or_float("right", "l"), { noremap = true, silent = true })
+
+vim.keymap.set("n", "<C-Left>", focus_or_float("left", "h"), { noremap = true, silent = true })
+vim.keymap.set("n", "<C-Down>", focus_or_float("down", "j"), { noremap = true, silent = true })
+vim.keymap.set("n", "<C-Up>", focus_or_float("up", "k"), { noremap = true, silent = true })
+vim.keymap.set("n", "<C-Right>", focus_or_float("right", "l"), { noremap = true, silent = true })
 
 vim.keymap.set("i", "<C-Left>", "<Esc><C-w>h", { noremap = true, silent = true })
 vim.keymap.set("i", "<C-Down>", "<Esc><C-w>j", { noremap = true, silent = true })
 vim.keymap.set("i", "<C-Up>", "<Esc><C-w>k", { noremap = true, silent = true })
 vim.keymap.set("i", "<C-Right>", "<Esc><C-w>l", { noremap = true, silent = true })
 
-vim.keymap.set("t", "<C-Left>", "<C-\\><C-n><C-w>h", { noremap = true, silent = true })
-vim.keymap.set("t", "<C-Down>", "<C-\\><C-n><C-w>j", { noremap = true, silent = true })
-vim.keymap.set("t", "<C-Up>", "<C-\\><C-n><C-w>k", { noremap = true, silent = true })
-vim.keymap.set("t", "<C-Right>", "<C-\\><C-n><C-w>l", { noremap = true, silent = true })
+local function terminal_focus_or_float(direction, normal)
+    return function()
+        local leave_terminal = vim.api.nvim_replace_termcodes("<C-\\><C-n>", true, false, true)
+        vim.api.nvim_feedkeys(leave_terminal, "n", false)
+        vim.schedule(focus_or_float(direction, normal))
+    end
+end
 
-vim.keymap.set("n", "<A-Left>", ":vertical resize -1<CR>", { silent = true })
-vim.keymap.set("n", "<A-Right>", ":vertical resize +1<CR>", { silent = true })
-vim.keymap.set("n", "<A-Up>", ":resize +1<CR>", { silent = true })
-vim.keymap.set("n", "<A-Down>", ":resize -1<CR>", { silent = true })
+vim.keymap.set("t", "<C-h>", terminal_focus_or_float("left", "h"), { noremap = true, silent = true })
+vim.keymap.set("t", "<C-j>", terminal_focus_or_float("down", "j"), { noremap = true, silent = true })
+vim.keymap.set("t", "<C-k>", terminal_focus_or_float("up", "k"), { noremap = true, silent = true })
+vim.keymap.set("t", "<C-l>", terminal_focus_or_float("right", "l"), { noremap = true, silent = true })
+vim.keymap.set("t", "<C-Left>", terminal_focus_or_float("left", "h"), { noremap = true, silent = true })
+vim.keymap.set("t", "<C-Down>", terminal_focus_or_float("down", "j"), { noremap = true, silent = true })
+vim.keymap.set("t", "<C-Up>", terminal_focus_or_float("up", "k"), { noremap = true, silent = true })
+vim.keymap.set("t", "<C-Right>", terminal_focus_or_float("right", "l"), { noremap = true, silent = true })
 
-vim.keymap.set("n", "<A-h>", ":vertical resize -1<CR>", { silent = true })
-vim.keymap.set("n", "<A-l>", ":vertical resize +1<CR>", { silent = true })
-vim.keymap.set("n", "<A-k>", ":resize +1<CR>", { silent = true })
-vim.keymap.set("n", "<A-j>", ":resize -1<CR>", { silent = true })
+local function resize_or_float(direction, delta, command)
+    return function()
+        if not floating.resize(direction, delta) then vim.cmd(command) end
+    end
+end
+
+vim.keymap.set("n", "<A-Left>", resize_or_float("left", -1, "vertical resize -1"), { silent = true })
+vim.keymap.set("n", "<A-Right>", resize_or_float("right", 1, "vertical resize +1"), { silent = true })
+vim.keymap.set("n", "<A-Up>", resize_or_float("up", 1, "resize +1"), { silent = true })
+vim.keymap.set("n", "<A-Down>", resize_or_float("down", -1, "resize -1"), { silent = true })
+
+vim.keymap.set("n", "<A-h>", resize_or_float("left", -1, "vertical resize -1"), { silent = true })
+vim.keymap.set("n", "<A-l>", resize_or_float("right", 1, "vertical resize +1"), { silent = true })
+vim.keymap.set("n", "<A-k>", resize_or_float("up", 1, "resize +1"), { silent = true })
+vim.keymap.set("n", "<A-j>", resize_or_float("down", -1, "resize -1"), { silent = true })

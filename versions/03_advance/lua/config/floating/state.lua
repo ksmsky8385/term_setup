@@ -62,6 +62,9 @@ function M.slot(slot_id)
         win = nil,
         view = nil,
         cursor = nil,
+        panes = nil,
+        layout = nil,
+        return_win = nil,
     }
 
     return M.slots[slot_id]
@@ -77,6 +80,20 @@ function M.mark_window(win, slot_id)
     vim.w[win].floating_slot_id = slot_id
 end
 
+function M.mark_pane(win, buf, slot_id, pane_id)
+    M.mark_window(win, slot_id)
+    vim.w[win].floating_pane_id = pane_id
+    M.mark_buffer(buf, slot_id)
+    vim.b[buf].floating_pane_id = pane_id
+end
+
+function M.window_pane_id(win)
+    win = win or vim.api.nvim_get_current_win()
+    if not M.valid_window(win) then return nil end
+    local ok, pane_id = pcall(vim.api.nvim_win_get_var, win, "floating_pane_id")
+    return ok and pane_id or "A"
+end
+
 function M.mark_buffer(buf, slot_id)
     slot_id = M.normalize_slot_id(slot_id)
 
@@ -88,6 +105,7 @@ function M.clear_buffer_slot(buf, slot_id)
 
     if M.valid_buffer(buf) and vim.b[buf].floating_slot_id == slot_id then
         vim.b[buf].floating_slot_id = nil
+        vim.b[buf].floating_pane_id = nil
     end
 end
 
@@ -126,6 +144,13 @@ function M.slot_label_for_buffer(buf)
 
     for slot_id, item in pairs(M.slots) do
         if item.buf == buf then
+            if item.panes then
+                for pane_id, pane in pairs(item.panes) do
+                    if pane.buf == buf then
+                        return M.label(slot_id) .. (vim.tbl_count(item.panes) > 1 and ("][" .. pane_id) or "")
+                    end
+                end
+            end
             return M.label(slot_id)
         end
     end
@@ -133,7 +158,10 @@ function M.slot_label_for_buffer(buf)
     local slot_id = vim.b[buf].floating_slot_id
 
     if slot_id ~= nil then
-        return M.label(slot_id)
+        local pane_id = vim.b[buf].floating_pane_id
+        local item = M.slots[M.normalize_slot_id(slot_id)]
+        local multiple = item and item.panes and vim.tbl_count(item.panes) > 1
+        return M.label(slot_id) .. (multiple and pane_id and ("][" .. pane_id) or "")
     end
 
     return nil
@@ -143,6 +171,16 @@ function M.assigned_slots_by_buffer()
     local assigned = {}
 
     for slot_id, item in pairs(M.slots) do
+        if item.panes then
+            local multiple = vim.tbl_count(item.panes) > 1
+            for pane_id, pane in pairs(item.panes) do
+                if M.valid_buffer(pane.buf) and vim.bo[pane.buf].filetype ~= M.SLOT_FILETYPE then
+                    assigned[pane.buf] = assigned[pane.buf] or {}
+                    table.insert(assigned[pane.buf], { slot = slot_id, label = M.label(slot_id) .. (multiple and ("][" .. pane_id) or ""), rank = M.slot_rank(slot_id) })
+                end
+            end
+            goto continue
+        end
         if M.valid_buffer(item.buf) and vim.bo[item.buf].filetype ~= M.SLOT_FILETYPE then
             assigned[item.buf] = assigned[item.buf] or {}
             table.insert(assigned[item.buf], {
@@ -151,6 +189,7 @@ function M.assigned_slots_by_buffer()
                 rank = M.slot_rank(slot_id),
             })
         end
+        ::continue::
     end
 
     for _, slots in pairs(assigned) do
@@ -168,6 +207,11 @@ function M.has_assignment(buf)
     end
 
     for _, item in pairs(M.slots) do
+        if item.panes then
+            for _, pane in pairs(item.panes) do
+                if pane.buf == buf then return true end
+            end
+        end
         if item.buf == buf then
             return true
         end
@@ -225,6 +269,30 @@ function M.current_slots()
     local entries = {}
 
     for slot_id, item in pairs(M.slots) do
+        if item.panes then
+            local panes = {}
+            for pane_id, pane in pairs(item.panes) do
+                local saved = { id = pane_id }
+                if M.valid_buffer(pane.buf) then
+                    local name = vim.api.nvim_buf_get_name(pane.buf)
+                    if name ~= "" and vim.bo[pane.buf].buftype == "" then
+                        saved.file = name
+                    end
+                end
+                table.insert(panes, saved)
+            end
+            table.sort(panes, function(a, b) return a.id < b.id end)
+            if #panes > 0 then
+                table.insert(entries, {
+                    slot = slot_id,
+                    panes = panes,
+                    layout = vim.deepcopy(item.layout),
+                    geometry = vim.deepcopy(item.geometry),
+                    visible = M.valid_window(item.win) == true,
+                })
+            end
+            goto continue
+        end
         if M.valid_buffer(item.buf) and vim.bo[item.buf].filetype ~= M.SLOT_FILETYPE then
             local name = vim.api.nvim_buf_get_name(item.buf)
 
@@ -236,6 +304,7 @@ function M.current_slots()
                 })
             end
         end
+        ::continue::
     end
 
     table.sort(entries, function(a, b)

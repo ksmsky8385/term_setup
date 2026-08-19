@@ -112,9 +112,11 @@ local function restore_floating_slots(floating_slots)
 
     for _, item in ipairs(floating_slots) do
         if type(item) == "table" then
-            pcall(floating.restore_slot, item.slot, item.file, {
-                visible = false,
-            })
+            if item.panes and type(floating.restore_group) == "function" then
+                pcall(floating.restore_group, item)
+            else
+                pcall(floating.restore_slot, item.slot, item.file, { visible = false })
+            end
         end
     end
 end

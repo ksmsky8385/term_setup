@@ -170,6 +170,71 @@ local function open_floating_slot(slot_id)
     return floating.open_slot(slot_id)
 end
 
+local function slot_pane_windows(slot_id)
+    local panes = {}
+    local ok_floating, floating = pcall(require, "config.floating")
+    if not ok_floating then return panes end
+    for _, win in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
+        if floating.window_slot_id(win) == tostring(slot_id) then
+            local pane_id = type(floating.window_pane_id) == "function" and floating.window_pane_id(win) or "A"
+            table.insert(panes, { id = pane_id, win = win })
+        end
+    end
+    table.sort(panes, function(a, b) return a.id < b.id end)
+    return panes
+end
+
+local function pick_floating_pane(slot_id)
+    local panes = slot_pane_windows(slot_id)
+    local opened_for_preview = false
+    local previous_win = vim.api.nvim_get_current_win()
+    local previous_slot
+
+    if #panes == 0 then
+        for _, win in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
+            local candidate = floating_slot_id(win)
+            if candidate ~= nil and tostring(candidate) ~= tostring(slot_id) then
+                previous_slot = tostring(candidate)
+                break
+            end
+        end
+        open_floating_slot(slot_id)
+        opened_for_preview = true
+        panes = slot_pane_windows(slot_id)
+        vim.cmd("redraw")
+    end
+    if #panes <= 1 then return panes[1] and panes[1].win or nil end
+
+    local function cancel_preview()
+        if not opened_for_preview then return end
+        local ok_floating, floating = pcall(require, "config.floating")
+        if ok_floating then
+            floating.toggle(slot_id)
+            if previous_slot then floating.open_slot(previous_slot) end
+        end
+        if vim.api.nvim_win_is_valid(previous_win) then
+            pcall(vim.api.nvim_set_current_win, previous_win)
+        end
+        vim.cmd("redraw")
+    end
+
+    local ids = vim.tbl_map(function(pane) return pane.id end, panes)
+    while true do
+        vim.api.nvim_echo({ {
+            "Pick " .. floating_slot_label(slot_id) .. " pane [" .. table.concat(ids, "/") .. "] (Enter/Esc cancel): ",
+        } }, false, {})
+        local ok, input = pcall(vim.fn.getcharstr)
+        if not ok or input == "\27" or input == "\13" or input == "\10" then
+            cancel_preview()
+            return nil
+        end
+        input = (input or ""):upper()
+        for _, pane in ipairs(panes) do
+            if input == pane.id then return pane.win end
+        end
+    end
+end
+
 local function add_slot_key(char_map, slot_id, target)
     local key = picker_key_for_slot(slot_id)
 
@@ -241,7 +306,12 @@ function M.label_for_window(win, exclude)
     local slot_id = floating_slot_id(win)
 
     if slot_id ~= nil then
-        return floating_slot_label(slot_id)
+        local label = floating_slot_label(slot_id)
+        local ok_floating, floating = pcall(require, "config.floating")
+        if ok_floating and type(floating.window_label) == "function" then
+            return floating.window_label(win) or label
+        end
+        return label
     end
 
     local index = 1
@@ -395,7 +465,6 @@ function M.pick_window(exclude)
     local previous = {}
     local char_map = {}
     local window_map = {}
-    local visible_slots = {}
     local laststatus = vim.o.laststatus
     local fillchars = vim.opt.fillchars:get()
     local old_stl = fillchars.stl
@@ -413,10 +482,6 @@ function M.pick_window(exclude)
     for _, win in ipairs(selectable) do
         local slot_id = floating_slot_id(win)
         local char = slot_id and picker_key_for_slot(slot_id) or picker_chars:sub(picker_index, picker_index)
-
-        if slot_id then
-            visible_slots[tostring(slot_id)] = true
-        end
 
         if not slot_id then
             picker_index = picker_index + 1
@@ -442,15 +507,19 @@ function M.pick_window(exclude)
             title_pos = config.title_pos,
         }
 
-        if slot_id then
-            add_slot_key(char_map, slot_id, win)
-        else
+        if not slot_id then
             char_map[char] = win
         end
 
         window_map[win] = true
 
         local label = slot_id and floating_slot_label(slot_id) or char
+        if slot_id then
+            local ok_floating, floating = pcall(require, "config.floating")
+            if ok_floating and type(floating.window_label) == "function" then
+                label = floating.window_label(win) or label
+            end
+        end
 
         if config.relative ~= "" then
             pcall(vim.api.nvim_win_set_config, win, {
@@ -474,12 +543,10 @@ function M.pick_window(exclude)
 
     for _, slot_id in ipairs(slot_ids) do
         slot_id = tostring(slot_id)
-
-        if not visible_slots[slot_id] then
-            add_slot_key(char_map, slot_id, function()
-                return open_floating_slot(slot_id)
-            end)
-        end
+        local selected_slot = slot_id
+        add_slot_key(char_map, selected_slot, function()
+            return pick_floating_pane(selected_slot)
+        end)
     end
 
     active_picker = {

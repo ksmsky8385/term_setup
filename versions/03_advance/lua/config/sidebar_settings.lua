@@ -241,31 +241,6 @@ function M.restore_agentic_width()
     end
 end
 
-local width_restore_pending = false
-
-local function schedule_agentic_width_restore()
-    if width_restore_pending then
-        return
-    end
-
-    width_restore_pending = true
-
-    vim.defer_fn(function()
-        width_restore_pending = false
-        M.restore_agentic_width()
-    end, 20)
-end
-
-local width_group = vim.api.nvim_create_augroup("SidebarAgenticFixedWidth", {
-    clear = true,
-})
-
-vim.api.nvim_create_autocmd({ "WinResized", "WinClosed" }, {
-    group = width_group,
-    callback = schedule_agentic_width_restore,
-    desc = "Keep the Agentic sidebar at its configured width",
-})
-
 function M.get(name)
     load()
     return values[name]

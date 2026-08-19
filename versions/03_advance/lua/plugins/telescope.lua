@@ -10,6 +10,9 @@ return {
         local action_state = require("telescope.actions.state")
         local builtin = require("telescope.builtin")
         local floating = require("config.floating")
+        local tree_settings = require("config.tree_settings")
+        local find_files
+        local live_grep
 
         local function is_nvim_tree()
             return vim.bo.filetype == "NvimTree"
@@ -20,7 +23,7 @@ return {
                 return
             end
 
-            builtin.live_grep({
+            live_grep({
                 default_text = vim.fn.expand("<cword>"),
             })
         end
@@ -50,7 +53,7 @@ return {
                 return
             end
 
-            builtin.live_grep({
+            live_grep({
                 default_text = text,
             })
         end
@@ -110,12 +113,67 @@ return {
             return opts
         end
 
-        local function find_files(opts)
-            builtin.find_files(slot_picker_opts(floating.window_slot_id(), opts))
+        local function sync_tree_filter(name)
+            local ok, api = pcall(require, "nvim-tree.api")
+            if not ok then return end
+            if name == "dotfiles" then
+                pcall(api.filter.dotfiles.toggle)
+            elseif name == "git_ignored" then
+                pcall(api.filter.git.ignored.toggle)
+            end
         end
 
-        local function live_grep(opts)
-            builtin.live_grep(slot_picker_opts(floating.window_slot_id(), opts))
+        local function visibility_picker_opts(opts, kind)
+            opts = vim.tbl_extend("force", {}, opts or {})
+            local show_hidden = not tree_settings.get("dotfiles")
+            local show_ignored = not tree_settings.get("git_ignored")
+            if kind == "files" then
+                opts.hidden = show_hidden
+                opts.no_ignore = show_ignored
+            else
+                local previous_args = opts.additional_args
+                opts.additional_args = function(...)
+                    local args = type(previous_args) == "function" and (previous_args(...) or {})
+                        or vim.deepcopy(previous_args or {})
+                    if show_hidden then table.insert(args, "--hidden") end
+                    if show_ignored then table.insert(args, "--no-ignore") end
+                    return args
+                end
+            end
+            local previous_attach = opts.attach_mappings
+
+            opts.attach_mappings = function(prompt_bufnr, map)
+                if previous_attach and previous_attach(prompt_bufnr, map) == false then return false end
+                local function toggle(name)
+                    return function()
+                        local prompt = action_state.get_current_line()
+                        tree_settings.toggle(name)
+                        sync_tree_filter(name)
+                        actions.close(prompt_bufnr)
+                        vim.schedule(function()
+                            if kind == "files" then
+                                find_files({ default_text = prompt })
+                            else
+                                live_grep({ default_text = prompt })
+                            end
+                        end)
+                    end
+                end
+                map("i", "H", toggle("dotfiles"))
+                map("n", "H", toggle("dotfiles"))
+                map("i", "I", toggle("git_ignored"))
+                map("n", "I", toggle("git_ignored"))
+                return true
+            end
+            return opts
+        end
+
+        find_files = function(opts)
+            builtin.find_files(slot_picker_opts(floating.window_slot_id(), visibility_picker_opts(opts, "files")))
+        end
+
+        live_grep = function(opts)
+            builtin.live_grep(slot_picker_opts(floating.window_slot_id(), visibility_picker_opts(opts, "grep")))
         end
 
         vim.api.nvim_create_user_command("FloatingFindFiles", function()
