@@ -522,9 +522,9 @@ function M.split(direction)
     item.panes[new_id] = { id = new_id, buf = buf, win = nil }
     layout.split(item, pane_id, direction, new_id)
     window.apply_layout(slot_id)
-    window.open_pane(slot_id, new_id, buf)
+    local new_win = window.open_pane(slot_id, new_id, buf)
     window.apply_layout(slot_id)
-    return true
+    return true, new_win
 end
 
 function M.focus(direction)

@@ -370,7 +370,13 @@ return {
             local ok_floating, floating = pcall(require, "config.floating")
 
             if ok_floating and floating.is_slot_window(target_win) then
-                vim.notify("Floating slots do not support splits.", vim.log.levels.WARN)
+                vim.api.nvim_set_current_win(target_win)
+                local direction = split_cmd:find("vsplit", 1, true) and "vertical" or "horizontal"
+                local handled, split_win = floating.split(direction)
+
+                if handled and split_win and vim.api.nvim_win_is_valid(split_win) then
+                    open_file_in_window(node, split_win)
+                end
                 return
             end
 

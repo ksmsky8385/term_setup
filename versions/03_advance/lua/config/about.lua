@@ -484,6 +484,7 @@ function M.open(opts)
         "    Space q / Q        플로팅 슬롯 버퍼 닫기/강제 닫기",
         "    Space wq           현재 플로팅 pane 닫기, 남은 pane 자동 확장",
         "    파일 트리 w        F 그룹 선택 후 분할 미리보기에서 A/B pane 선택",
+        "    파일 트리 s/v      선택한 플로팅 pane을 상하/좌우 분할 후 파일 열기",
         "    pane 선택 취소     A/B 입력 단계에서 Enter 또는 Esc, 임시 미리보기 복구",
         "    Ctrl-h/j/k/l       단일 pane: 플로팅 창 위치를 방향별 1칸 이동",
         "    Ctrl-Arrow         단일 pane: 방향키로 플로팅 창 위치 1칸 이동",
