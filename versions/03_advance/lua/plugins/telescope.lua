@@ -113,16 +113,6 @@ return {
             return opts
         end
 
-        local function sync_tree_filter(name)
-            local ok, api = pcall(require, "nvim-tree.api")
-            if not ok then return end
-            if name == "dotfiles" then
-                pcall(api.filter.dotfiles.toggle)
-            elseif name == "git_ignored" then
-                pcall(api.filter.git.ignored.toggle)
-            end
-        end
-
         local function visibility_picker_opts(opts, kind)
             opts = vim.tbl_extend("force", {}, opts or {})
             local show_hidden = not tree_settings.get("dotfiles")
@@ -139,31 +129,6 @@ return {
                     if show_ignored then table.insert(args, "--no-ignore") end
                     return args
                 end
-            end
-            local previous_attach = opts.attach_mappings
-
-            opts.attach_mappings = function(prompt_bufnr, map)
-                if previous_attach and previous_attach(prompt_bufnr, map) == false then return false end
-                local function toggle(name)
-                    return function()
-                        local prompt = action_state.get_current_line()
-                        tree_settings.toggle(name)
-                        sync_tree_filter(name)
-                        actions.close(prompt_bufnr)
-                        vim.schedule(function()
-                            if kind == "files" then
-                                find_files({ default_text = prompt })
-                            else
-                                live_grep({ default_text = prompt })
-                            end
-                        end)
-                    end
-                end
-                map("i", "H", toggle("dotfiles"))
-                map("n", "H", toggle("dotfiles"))
-                map("i", "I", toggle("git_ignored"))
-                map("n", "I", toggle("git_ignored"))
-                return true
             end
             return opts
         end
