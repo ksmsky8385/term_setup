@@ -2,18 +2,34 @@
 
 set -u
 
-# 개발 도구 캐시 경로를 이 배열에서 자유롭게 추가하거나 제거하세요.
+# Clean both the default and a relocated Codex home, without duplicates.
+CODEX_DATA_DIRS=("$HOME/.codex")
+if [ -n "${CODEX_HOME:-}" ] && [ "$CODEX_HOME" != "$HOME/.codex" ]; then
+    CODEX_DATA_DIRS+=("$CODEX_HOME")
+fi
+
+# 대화 내역을 제외한 기타 캐시 경로를 이 배열에서 자유롭게 추가하거나 제거하세요.
 # 반드시 절대 경로를 사용하고, 경로별로 큰따옴표를 유지하세요.
-CACHE_PATHS=(
+OTHER_CACHE_PATHS=(
     "$HOME/.cache/nvim"
     "$HOME/.cache/antigravity"
     "$HOME/.gemini/antigravity-cli"
     "$HOME/.cache/codex"
-    "$HOME/.codex/sessions"
-    "$HOME/.codex/tmp"
-    "$HOME/.codex/log"
-    "$HOME/.codex/logs"
 )
+
+for codex_dir in "${CODEX_DATA_DIRS[@]}"; do
+    OTHER_CACHE_PATHS+=(
+        "$codex_dir/tmp"
+        "$codex_dir/log"
+        "$codex_dir/logs"
+    )
+done
+
+# Codex 대화 본문입니다. 캐시와 분리하여 필요할 때만 삭제합니다.
+CONVERSATION_PATHS=()
+for codex_dir in "${CODEX_DATA_DIRS[@]}"; do
+    CONVERSATION_PATHS+=("$codex_dir/sessions")
+done
 
 # 브라우저와 데스크톱 앱에서 다시 생성할 수 있는 캐시 경로입니다.
 # 앱 프로필, 쿠키, 로그인 정보, 확장 프로그램 데이터는 포함하지 않습니다.
@@ -68,8 +84,10 @@ APP_CACHE_PATHS=(
 
 # Codex standalone updater keeps every installed version under this directory.
 # The release referenced by `current` is retained and only older releases are removed.
-CODEX_RELEASES_DIR="$HOME/.codex/packages/standalone/releases"
-CODEX_CURRENT_LINK="$HOME/.codex/packages/standalone/current"
+CODEX_RELEASES_DIRS=()
+for codex_dir in "${CODEX_DATA_DIRS[@]}"; do
+    CODEX_RELEASES_DIRS+=("$codex_dir/packages/standalone/releases")
+done
 
 is_safe_target() {
     local target="${1%/}"
@@ -125,25 +143,30 @@ delete_paths() {
 
 delete_old_codex_releases() {
     local current_release=""
+    local current_link
+    local releases_dir
     local release
     local release_path
     local deleted_release_count=0
 
-    if [ ! -d "$CODEX_RELEASES_DIR" ]; then
-        echo "건너뜀: 경로가 없습니다: $CODEX_RELEASES_DIR"
-        DELETED_RELEASE_COUNT=0
-        return
-    fi
+    for releases_dir in "${CODEX_RELEASES_DIRS[@]}"; do
+        if [ ! -d "$releases_dir" ]; then
+            echo "건너뜀: 경로가 없습니다: $releases_dir"
+            continue
+        fi
 
-    current_release=""
-    if [ -e "$CODEX_CURRENT_LINK" ]; then
-        current_release="$(cd -P -- "$CODEX_CURRENT_LINK" 2>/dev/null && pwd)"
-    fi
+        current_link="${releases_dir%/releases}/current"
+        current_release=""
+        if [ -e "$current_link" ]; then
+            current_release="$(cd -P -- "$current_link" 2>/dev/null && pwd)"
+        fi
 
-    if [ -z "$current_release" ]; then
-        echo "건너뜀: 현재 Codex 패키지를 확인할 수 없습니다: $CODEX_CURRENT_LINK"
-    else
-        for release in "$CODEX_RELEASES_DIR"/*; do
+        if [ -z "$current_release" ]; then
+            echo "건너뜀: 현재 Codex 패키지를 확인할 수 없습니다: $current_link"
+            continue
+        fi
+
+        for release in "$releases_dir"/*; do
             [ -e "$release" ] || continue
 
             release_path="$(cd -P -- "$release" 2>/dev/null && pwd)" || continue
@@ -156,7 +179,7 @@ delete_old_codex_releases() {
             echo "삭제 완료: 이전 Codex 패키지: $release"
             deleted_release_count=$((deleted_release_count + 1))
         done
-    fi
+    done
 
     DELETED_RELEASE_COUNT="$deleted_release_count"
 }
@@ -173,31 +196,70 @@ show_targets() {
     done
 }
 
-cleanup_development_cache() {
-    show_targets "개발 도구 캐시" "${CACHE_PATHS[@]}"
-    printf '  - %s (현재 Codex 버전 제외)\n' "$CODEX_RELEASES_DIR"
+cleanup_old_codex_releases() {
+    echo
+    echo "삭제 대상으로 지정된 이전 Codex 버전:"
+    for releases_dir in "${CODEX_RELEASES_DIRS[@]}"; do
+        printf '  - %s (현재 Codex 버전 제외)\n' "$releases_dir"
+    done
 
-    if ! ask_to_delete "개발 도구 캐시"; then
-        echo "캐시 삭제를 취소했습니다."
+    if ! ask_to_delete "이전 Codex 버전"; then
+        echo "이전 Codex 버전 삭제를 취소했습니다."
         return
     fi
 
-    delete_paths "${CACHE_PATHS[@]}"
     delete_old_codex_releases
-    echo "개발 도구 캐시 정리가 완료되었습니다. 삭제한 경로: ${DELETED_PATH_COUNT}개, 이전 Codex 패키지: ${DELETED_RELEASE_COUNT}개"
+    echo "이전 Codex 버전 정리가 완료되었습니다. 삭제한 패키지: ${DELETED_RELEASE_COUNT}개"
 }
 
-cleanup_app_cache() {
-    show_targets "앱 캐시" "${APP_CACHE_PATHS[@]}"
+cleanup_other_cache() {
+    show_targets "기타 캐시" "${OTHER_CACHE_PATHS[@]}" "${APP_CACHE_PATHS[@]}"
     echo "주의: 브라우저, Discord, Obsidian, GitHub Desktop을 먼저 종료하세요."
 
-    if ! ask_to_delete "앱 캐시"; then
+    if ! ask_to_delete "기타 캐시"; then
         echo "캐시 삭제를 취소했습니다."
         return
     fi
 
-    delete_paths "${APP_CACHE_PATHS[@]}"
-    echo "앱 캐시 정리가 완료되었습니다. 삭제한 경로: ${DELETED_PATH_COUNT}개"
+    delete_paths "${OTHER_CACHE_PATHS[@]}" "${APP_CACHE_PATHS[@]}"
+    echo "기타 캐시 정리가 완료되었습니다. 삭제한 경로: ${DELETED_PATH_COUNT}개"
+}
+
+cleanup_conversations() {
+    show_targets "Codex 대화 내역" "${CONVERSATION_PATHS[@]}"
+    echo "주의: 삭제한 대화 내역은 복구할 수 없습니다."
+
+    if ! ask_to_delete "Codex 대화 내역"; then
+        echo "대화 내역 삭제를 취소했습니다."
+        return
+    fi
+
+    delete_paths "${CONVERSATION_PATHS[@]}"
+    echo "Codex 대화 내역 정리가 완료되었습니다. 삭제한 경로: ${DELETED_PATH_COUNT}개"
+}
+
+cleanup_all() {
+    local releases_dir
+    local target
+
+    echo
+    echo "전체 삭제 대상:"
+    for releases_dir in "${CODEX_RELEASES_DIRS[@]}"; do
+        printf '  - %s (현재 Codex 버전 제외)\n' "$releases_dir"
+    done
+    for target in "${OTHER_CACHE_PATHS[@]}" "${APP_CACHE_PATHS[@]}" "${CONVERSATION_PATHS[@]}"; do
+        printf '  - %s\n' "$target"
+    done
+    echo "주의: 앱을 먼저 종료하세요. Codex 대화 내역은 복구할 수 없습니다."
+
+    if ! ask_to_delete "전체 캐시와 대화 내역"; then
+        echo "전체 삭제를 취소했습니다."
+        return
+    fi
+
+    delete_old_codex_releases
+    delete_paths "${OTHER_CACHE_PATHS[@]}" "${APP_CACHE_PATHS[@]}" "${CONVERSATION_PATHS[@]}"
+    echo "전체 정리가 완료되었습니다. 삭제한 경로: ${DELETED_PATH_COUNT}개, 이전 Codex 패키지: ${DELETED_RELEASE_COUNT}개"
 }
 
 wait_for_cache_menu() {
@@ -211,31 +273,35 @@ while true; do
     echo
     echo "캐시 비우기"
     echo "----------------------------------------------------"
-    echo "1. 개발 도구 캐시 지우기"
-    echo "2. 앱캐쉬 지우기"
-    echo "3. 전체 캐시 지우기"
-    echo "4. 돌아가기"
+    echo "1. 이전 Codex 버전 파일 지우기"
+    echo "2. 기타 캐시 지우기"
+    echo "3. Codex 대화 내역 지우기"
+    echo "4. 전부 지우기"
+    echo "5. 돌아가기"
     echo "----------------------------------------------------"
     printf "선택: "
     read -r choice
 
     case "$choice" in
         1)
-            cleanup_development_cache
+            cleanup_old_codex_releases
             wait_for_cache_menu
             ;;
         2)
-            cleanup_app_cache
+            cleanup_other_cache
             wait_for_cache_menu
             ;;
         3)
-            cleanup_development_cache
-            cleanup_app_cache
+            cleanup_conversations
             wait_for_cache_menu
             ;;
-        4) exit 0 ;;
+        4)
+            cleanup_all
+            wait_for_cache_menu
+            ;;
+        5) exit 0 ;;
         *)
-            echo "1부터 4 사이의 번호를 입력하세요."
+            echo "1부터 5 사이의 번호를 입력하세요."
             wait_for_cache_menu
             ;;
     esac

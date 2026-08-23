@@ -5,6 +5,10 @@ set -o pipefail
 
 NVM_VERSION="v0.40.4"
 NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
+CODEX_DATA_DIRS=("$HOME/.codex")
+if [ -n "${CODEX_HOME:-}" ] && [ "$CODEX_HOME" != "$HOME/.codex" ]; then
+    CODEX_DATA_DIRS+=("$CODEX_HOME")
+fi
 BACK_TO_MENU_STATUS=10
 
 load_nvm() {
@@ -140,12 +144,16 @@ remove_antigravity_cache() {
 }
 
 remove_codex_cache() {
+    local codex_dir
+
     echo "Codex 캐시 삭제"
 
     rm -rf "$HOME/.cache/codex"
-    rm -rf "$HOME/.codex/tmp"
-    rm -rf "$HOME/.codex/log"
-    rm -rf "$HOME/.codex/logs"
+    for codex_dir in "${CODEX_DATA_DIRS[@]}"; do
+        rm -rf "$codex_dir/tmp"
+        rm -rf "$codex_dir/log"
+        rm -rf "$codex_dir/logs"
+    done
 
     echo "Codex 캐시 정리 완료"
 }
@@ -174,12 +182,16 @@ remove_antigravity() {
 }
 
 remove_codex() {
+    local codex_dir
+
     confirm "Codex CLI 삭제를 진행하겠습니까?" || return 0
 
     echo "Codex CLI 삭제"
 
     rm -f "$HOME/.local/bin/codex"
-    rm -rf "$HOME/.codex"
+    for codex_dir in "${CODEX_DATA_DIRS[@]}"; do
+        rm -rf "$codex_dir"
+    done
     rm -rf "$HOME/.config/codex"
     rm -rf "$HOME/.local/share/codex"
     rm -rf "$HOME/.local/state/codex"
