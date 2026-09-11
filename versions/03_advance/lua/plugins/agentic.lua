@@ -179,14 +179,19 @@ local function allow_dashboard_as_fallback()
 
     local original_find = ChatWidget.find_first_non_widget_window
 
-    ChatWidget.find_first_non_widget_window = function(self)
-        local win = original_find(self)
+    ChatWidget.find_first_non_widget_window = function(self, tabpage)
+        local win = original_find(self, tabpage)
 
         if win then
             return win
         end
 
-        for _, candidate in ipairs(vim.api.nvim_tabpage_list_wins(self.tab_page_id)) do
+        local widget_tab = tabpage or self:get_visible_tab_id()
+        if not widget_tab or not vim.api.nvim_tabpage_is_valid(widget_tab) then
+            return nil
+        end
+
+        for _, candidate in ipairs(vim.api.nvim_tabpage_list_wins(widget_tab)) do
             if
                 vim.api.nvim_win_is_valid(candidate)
                 and vim.api.nvim_win_get_config(candidate).relative == ""
@@ -223,7 +228,7 @@ local function refresh_headers_after_show()
             local anchor_edge
 
             if position == "left" or position == "right" then
-                for _, win in ipairs(vim.api.nvim_tabpage_list_wins(self.tab_page_id)) do
+                for _, win in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
                     if
                         vim.api.nvim_win_is_valid(win)
                         and vim.api.nvim_win_get_config(win).relative == ""
