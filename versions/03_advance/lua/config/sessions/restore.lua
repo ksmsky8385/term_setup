@@ -91,7 +91,10 @@ local function restore_terminals(terminals)
                     pcall(vim.cmd, "lcd " .. vim.fn.fnameescape(item.cwd))
                 end
 
-                pcall(terminal.create_buffer_terminal)
+                local restored_buf = terminal.restore_buffer(item, win)
+                if restored_buf then
+                    vim.api.nvim_win_set_buf(win, restored_buf)
+                end
             end
         end
 

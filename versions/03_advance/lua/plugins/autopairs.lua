@@ -6,6 +6,8 @@ return {
             check_ts = true,
         })
 
+        require("config.editor_settings").apply_autopairs()
+
         local closers = {
             [")"] = true,
             ["]"] = true,

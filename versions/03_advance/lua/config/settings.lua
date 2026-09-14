@@ -46,6 +46,12 @@ end
 local function open_main()
     picker("Settings", {
         {
+            label = "Editor settings",
+            action = function()
+                M.open("editor")
+            end,
+        },
+        {
             label = "Buffer settings",
             action = function()
                 M.open("buffer")
@@ -94,6 +100,23 @@ local function open_main()
             end,
         },
     })
+end
+
+local function open_editor()
+    local editor = require("config.editor_settings")
+    local entries = { { label = "< Back", action = open_main } }
+    for _, option in ipairs(editor.options) do
+        local value = editor.get(option.name)
+        local status = type(value) == "boolean" and (value and "enabled" or "disabled") or value
+        table.insert(entries, {
+            label = option.label .. ": " .. status,
+            action = function()
+                editor.cycle(option.name)
+                M.open("editor")
+            end,
+        })
+    end
+    picker("Settings > Editor", entries)
 end
 
 local function open_buffer()
@@ -577,7 +600,9 @@ local function open_snippets()
 end
 
 function M.open(menu)
-    if menu == "buffer" then
+    if menu == "editor" then
+        open_editor()
+    elseif menu == "buffer" then
         open_buffer()
     elseif menu == "sidebar" then
         open_sidebar()

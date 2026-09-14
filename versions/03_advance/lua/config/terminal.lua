@@ -73,6 +73,60 @@ function M.status_name()
     return shell_name() .. " [Terminal]"
 end
 
+function M.configure_window(win)
+    vim.wo[win].number = false
+    vim.wo[win].relativenumber = false
+    vim.wo[win].signcolumn = "no"
+    vim.wo[win].foldcolumn = "0"
+    vim.wo[win].statuscolumn = ""
+    vim.wo[win].list = false
+    vim.wo[win].spell = false
+    vim.wo[win].cursorline = false
+    vim.wo[win].cursorcolumn = false
+end
+
+function M.start_pending(win)
+    local buf = vim.api.nvim_win_get_buf(win)
+    local saved = vim.b[buf].pending_terminal_restore
+    if not saved then return true end
+    local cwd = type(saved.cwd) == "string" and vim.fn.isdirectory(saved.cwd) == 1
+        and saved.cwd or vim.fn.getcwd()
+
+    M.configure_window(win)
+    local ok, job = pcall(vim.api.nvim_win_call, win, function()
+        return vim.fn.termopen(vim.o.shell, { cwd = cwd })
+    end)
+    if not ok or type(job) ~= "number" or job <= 0 then
+        vim.notify("Failed to restore terminal: " .. tostring(job), vim.log.levels.ERROR)
+        return false
+    end
+    vim.b[buf].pending_terminal_restore = nil
+    return true
+end
+
+function M.restore_buffer(saved, win)
+    local buf = vim.api.nvim_create_buf(true, false)
+    vim.bo[buf].bufhidden = "hide"
+    vim.bo[buf].swapfile = false
+    vim.b[buf].pending_terminal_restore = { cwd = saved.cwd or vim.fn.getcwd() }
+    if win then
+        vim.api.nvim_win_set_buf(win, buf)
+        M.start_pending(win)
+    end
+    return buf
+end
+
+function M.setup()
+    local group = vim.api.nvim_create_augroup("TerminalWindowOptions", { clear = true })
+    vim.api.nvim_create_autocmd({ "TermOpen", "BufWinEnter", "WinEnter" }, {
+        group = group,
+        callback = function()
+            local win = vim.api.nvim_get_current_win()
+            if vim.bo.buftype == "terminal" then M.configure_window(win) end
+        end,
+    })
+end
+
 function M.create_buffer_terminal(opts)
     opts = opts or {}
 

@@ -151,7 +151,9 @@ function M.restore_group(saved)
     for _, saved_pane in ipairs(saved.panes) do
         if type(saved_pane.id) == "string" then
             local buf
-            if type(saved_pane.file) == "string" and vim.fn.filereadable(saved_pane.file) == 1 then
+            if saved_pane.kind == "terminal" then
+                buf = require("config.terminal").restore_buffer(saved_pane) or buffers.create_home(slot_id)
+            elseif type(saved_pane.file) == "string" and vim.fn.filereadable(saved_pane.file) == 1 then
                 buf = vim.fn.bufadd(saved_pane.file)
                 vim.fn.bufload(buf)
                 vim.bo[buf].buflisted = true

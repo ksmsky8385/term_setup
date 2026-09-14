@@ -5,9 +5,25 @@ M.save_path = vim.fn.stdpath("state") .. "/ui-toggle-settings.json"
 local defaults = {
     minimap = false,
     scrollview = false,
+    editor_autopairs = true,
+    editor_line_numbers = "absolute",
+    editor_wrap = true,
+    editor_linebreak = false,
+    editor_breakindent = false,
+    editor_cursorline = false,
+    editor_cursorcolumn = false,
+    editor_list = true,
+    editor_spell = false,
 }
 
 local values
+
+local function valid(name, value)
+    if name == "editor_line_numbers" then
+        return vim.tbl_contains({ "absolute", "relative", "hybrid", "off" }, value)
+    end
+    return defaults[name] ~= nil and type(value) == "boolean"
+end
 
 local function legacy_path(name)
     return vim.fn.stdpath("state") .. "/toggles/" .. name
@@ -34,8 +50,8 @@ local function load()
             pcall(vim.json.decode, table.concat(vim.fn.readfile(M.save_path), "\n"))
 
         if ok and type(saved) == "table" then
-            for name, default in pairs(defaults) do
-                if type(saved[name]) == type(default) then
+            for name in pairs(defaults) do
+                if valid(name, saved[name]) then
                     values[name] = saved[name]
                 end
             end
@@ -44,7 +60,7 @@ local function load()
 
     local migrated = false
 
-    for name in pairs(defaults) do
+    for _, name in ipairs({ "minimap", "scrollview" }) do
         local path = legacy_path(name)
 
         if vim.fn.filereadable(path) == 1 then
@@ -57,7 +73,7 @@ local function load()
     save()
 
     if migrated then
-        for name in pairs(defaults) do
+        for _, name in ipairs({ "minimap", "scrollview" }) do
             vim.fn.delete(legacy_path(name))
         end
 
@@ -79,7 +95,7 @@ function M.write(name, enabled)
     load()
 
     assert(defaults[name] ~= nil, "Unknown UI toggle setting: " .. name)
-    assert(type(enabled) == "boolean", "UI toggle setting must be boolean: " .. name)
+    assert(valid(name, enabled), "Invalid UI toggle setting: " .. name)
 
     values[name] = enabled
     save()

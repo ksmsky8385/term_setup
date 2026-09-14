@@ -22,6 +22,7 @@ end
 
 function M.is_deletable(buf)
     return valid_buffer(buf)
+        and not vim.b[buf].pending_terminal_restore
         and vim.api.nvim_buf_get_name(buf) == ""
         and vim.bo[buf].buftype == ""
         and vim.bo[buf].filetype == ""

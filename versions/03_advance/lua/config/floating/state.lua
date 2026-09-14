@@ -265,6 +265,23 @@ function M.slot_sort_rank(buf)
     return M.slot_rank(slot_id)
 end
 
+local function saved_pane(pane_id, buf)
+    local saved = { id = pane_id }
+    if not M.valid_buffer(buf) then return saved end
+
+    local name = vim.api.nvim_buf_get_name(buf)
+    if vim.b[buf].pending_terminal_restore then
+        saved.kind = "terminal"
+        saved.cwd = vim.b[buf].pending_terminal_restore.cwd
+    elseif vim.bo[buf].buftype == "terminal" then
+        saved.kind = "terminal"
+        saved.cwd = require("config.terminal").actual_cwd(buf) or vim.fn.getcwd()
+    elseif name ~= "" and vim.bo[buf].buftype == "" then
+        saved.file = name
+    end
+    return saved
+end
+
 function M.current_slots()
     local entries = {}
 
@@ -272,14 +289,7 @@ function M.current_slots()
         if item.panes then
             local panes = {}
             for pane_id, pane in pairs(item.panes) do
-                local saved = { id = pane_id }
-                if M.valid_buffer(pane.buf) then
-                    local name = vim.api.nvim_buf_get_name(pane.buf)
-                    if name ~= "" and vim.bo[pane.buf].buftype == "" then
-                        saved.file = name
-                    end
-                end
-                table.insert(panes, saved)
+                table.insert(panes, saved_pane(pane_id, pane.buf))
             end
             table.sort(panes, function(a, b) return a.id < b.id end)
             if #panes > 0 then
@@ -296,7 +306,15 @@ function M.current_slots()
         if M.valid_buffer(item.buf) and vim.bo[item.buf].filetype ~= M.SLOT_FILETYPE then
             local name = vim.api.nvim_buf_get_name(item.buf)
 
-            if name ~= "" and vim.bo[item.buf].buftype == "" then
+            if vim.bo[item.buf].buftype == "terminal" or vim.b[item.buf].pending_terminal_restore then
+                table.insert(entries, {
+                    slot = slot_id,
+                    panes = { saved_pane("A", item.buf) },
+                    layout = { pane = "A" },
+                    geometry = vim.deepcopy(item.geometry),
+                    visible = M.valid_window(item.win) == true,
+                })
+            elseif name ~= "" and vim.bo[item.buf].buftype == "" then
                 table.insert(entries, {
                     slot = slot_id,
                     file = name,

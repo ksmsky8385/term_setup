@@ -9,7 +9,10 @@
   "modules": [
     "os",
     "kernel",
-    "users",
+    {
+        "type": "users",
+        "myselfOnly": true
+    },
     "memory",
     {
       "type": "disk",

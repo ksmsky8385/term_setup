@@ -9,6 +9,7 @@ function M.listed_empty()
     for _, buf in ipairs(vim.api.nvim_list_bufs()) do
         if
             vim.api.nvim_buf_is_valid(buf)
+            and not vim.b[buf].pending_terminal_restore
             and vim.bo[buf].buflisted
             and vim.api.nvim_buf_get_name(buf) == ""
             and vim.bo[buf].buftype == ""

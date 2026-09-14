@@ -8,6 +8,15 @@ vim.keymap.set("t", "<C-[>", "<C-\\><C-n>", {
     silent = true,
 })
 
+vim.keymap.set("n", "<leader><leader>", function()
+    return vim.bo.buftype == "" and vim.bo.modifiable and "i" or "<Ignore>"
+end, {
+    expr = true,
+    noremap = true,
+    silent = true,
+    desc = "Enter insert mode in file buffer",
+})
+
 vim.cmd([[nnoremenu <silent> 500.10 PopUp.Toggle\ Mode <Cmd>startinsert<CR>]])
 vim.cmd([[inoremenu <silent> 500.10 PopUp.Toggle\ Mode <Cmd>stopinsert<CR>]])
 

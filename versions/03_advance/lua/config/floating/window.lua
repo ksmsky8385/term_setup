@@ -95,6 +95,10 @@ function M.open_pane(slot_id, pane_id, buf)
     pane.win, pane.buf = win, buf
     state.mark_pane(win, buf, slot_id, pane_id)
     configure_window(win)
+    if vim.b[buf].pending_terminal_restore then
+        require("config.terminal").start_pending(win)
+        M.update_title(slot_id)
+    end
     vim.api.nvim_create_autocmd("BufEnter", {
         callback = function()
             if state.valid_window(win) and vim.api.nvim_get_current_win() == win then
@@ -137,7 +141,7 @@ title_for_buffer = function(slot_id, buf)
     if state.valid_buffer(buf) then
         local path = vim.api.nvim_buf_get_name(buf)
 
-        if vim.bo[buf].buftype == "terminal" then
+        if vim.bo[buf].buftype == "terminal" or vim.b[buf].pending_terminal_restore then
             name = vim.fn.fnamemodify(vim.o.shell, ":t") .. " [Terminal]"
         elseif path ~= "" then
             name = vim.fn.fnamemodify(path, ":t")
@@ -164,6 +168,9 @@ configure_window = function(win)
     vim.wo[win].number = not plain_window
     vim.wo[win].relativenumber = false
     vim.wo[win].signcolumn = plain_window and "no" or "yes"
+    if vim.bo[buf].buftype == "terminal" or vim.b[buf].pending_terminal_restore then
+        require("config.terminal").configure_window(win)
+    end
 end
 
 function M.update_title(slot_id)

@@ -426,7 +426,10 @@ local function restore_terminal(win, descriptor)
     local ok, terminal = pcall(require, "config.terminal")
 
     if ok then
-        pcall(terminal.create_buffer_terminal)
+        local buf = terminal.restore_buffer(descriptor, win)
+        if valid_buffer(buf) then
+            vim.api.nvim_win_set_buf(win, buf)
+        end
     else
         pcall(vim.cmd, "terminal")
     end
