@@ -8,7 +8,8 @@ return {
     ft = { "markdown" },
     build = "cd app && npm install",
 
-    init = function()
+    init = function(plugin)
+        require("config.markdown_preview").repair_on_start(plugin)
         vim.g.mkdp_filetypes = { "markdown" }
         vim.g.mkdp_auto_start = 0
         vim.g.mkdp_auto_close = 0

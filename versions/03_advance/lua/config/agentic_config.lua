@@ -150,101 +150,102 @@ local function brief_title(title)
     return title
 end
 
-local function restore(current_session, choice)
-    local has_messages = current_session.session_id ~= nil
-        and current_session.chat_history ~= nil
-        and #current_session.chat_history.messages > 0
-
-    local function load()
-        current_session:load_acp_session(
-            choice.session_id,
-            choice.title,
-            choice.updated_at
-        )
-        current_session.widget:show()
-    end
-
-    if not has_messages then
-        load()
+local function restore(context, choice)
+    local registry = require("agentic.session_registry")
+    local existing = registry.find_by_acp_session_id(choice.session_id, context.agent)
+    if not existing and not (context.agent.agent_capabilities or {}).loadSession then
+        vim.notify("Agent does not support loading sessions", vim.log.levels.WARN)
         return
     end
 
-    vim.ui.select({
-        "Cancel",
-        "Clear current session and restore",
-    }, {
-        prompt = "Current session has messages. What would you like to do?",
-    }, function(answer)
-        if answer == "Clear current session and restore" then
-            load()
-        end
+    registry.choose_session_lifecycle(context.source, "Restore session:", function(destroy_source)
+        registry.replace(context.source, context.provider_name, {
+            kind = "load",
+            session_id = choice.session_id,
+            title = choice.title,
+            timestamp = choice.updated_at,
+        }, {
+            agent = context.agent,
+            retain_source = context.source ~= nil and not destroy_source,
+        })
     end)
 end
 
 function M.show()
     local registry = require("agentic.session_registry")
 
-    registry.get_session_for_tab_page(nil, function(current_session)
-        local cwd = vim.fn.getcwd()
-        local provider_name = current_session.agent.provider_config.name
-            or "Unknown provider"
+    local source = registry.current()
+    local provider_name = source and source.provider_name or require("agentic.config").provider
+    local agent = source and source.agent
+        or require("agentic.acp.agent_instance").get_instance(provider_name)
+    if not agent then
+        return
+    end
+    local context = { source = source, provider_name = provider_name, agent = agent }
+    local cwd = vim.fn.getcwd()
 
-        current_session.agent:when_ready(function()
-            current_session.agent:list_sessions(cwd, function(result, err)
-                vim.schedule(function()
-                    if err or not result then
-                        vim.notify(
-                            "Failed to list Agentic sessions",
-                            vim.log.levels.WARN
-                        )
-                        return
+    agent:when_ready(function()
+        agent:list_sessions(cwd, function(result, err)
+            vim.schedule(function()
+                if err or not result then
+                    vim.notify(
+                        "Failed to list Agentic sessions: " .. (err and err.message or "unknown error"),
+                        vim.log.levels.WARN
+                    )
+                    return
+                end
+
+                local items = {}
+                for _, session in ipairs(result.sessions or {}) do
+                    local date = session.updatedAt
+                            and session.updatedAt
+                                :sub(1, 16)
+                                :gsub("T", " ")
+                        or "unknown date"
+                    local display_title = brief_title(session.title)
+
+                    items[#items + 1] = {
+                        display = string.format(
+                            "[%s]  %s  %s",
+                            provider_name,
+                            date,
+                            display_title
+                        ),
+                        session_id = session.sessionId,
+                        title = session.title,
+                        preview_title = display_title,
+                        updated_at = session.updatedAt,
+                        preview_lines = preview_lines(
+                            session.title,
+                            display_title,
+                            provider_name,
+                            date,
+                            session.sessionId
+                        ),
+                    }
+                end
+
+                if #items == 0 then
+                    vim.notify(
+                        "No saved Agentic sessions found",
+                        vim.log.levels.INFO
+                    )
+                    return
+                end
+
+                select_session(items, function(choice)
+                    if choice then
+                        restore(context, choice)
                     end
-
-                    local items = {}
-                    for _, session in ipairs(result.sessions or {}) do
-                        local date = session.updatedAt
-                                and session.updatedAt
-                                    :sub(1, 16)
-                                    :gsub("T", " ")
-                            or "unknown date"
-                        local display_title = brief_title(session.title)
-
-                        items[#items + 1] = {
-                            display = string.format(
-                                "[%s]  %s  %s",
-                                provider_name,
-                                date,
-                                display_title
-                            ),
-                            session_id = session.sessionId,
-                            title = session.title,
-                            preview_title = display_title,
-                            updated_at = date,
-                            preview_lines = preview_lines(
-                                session.title,
-                                display_title,
-                                provider_name,
-                                date,
-                                session.sessionId
-                            ),
-                        }
-                    end
-
-                    if #items == 0 then
-                        vim.notify(
-                            "No saved Agentic sessions found",
-                            vim.log.levels.INFO
-                        )
-                        return
-                    end
-
-                    select_session(items, function(choice)
-                        if choice then
-                            restore(current_session, choice)
-                        end
-                    end)
                 end)
             end)
+        end)
+    end, function(err)
+        vim.schedule(function()
+            vim.notify(
+                "Failed to list Agentic sessions: " .. (err.message or "provider unavailable"),
+                vim.log.levels.WARN
+            )
         end)
     end)
 end
