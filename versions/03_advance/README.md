@@ -28,11 +28,14 @@ hybrid는 커서 줄만 실제 줄번호, 나머지는 상대 번호로 표시�
 [Snacks 토글 사례](https://github.com/folke/snacks.nvim/blob/main/docs/toggle.md),
 [nvim-autopairs 활성화 API](https://github.com/windwp/nvim-autopairs#plugin-integration).
 
-## `markdown-preview.nvim` 직접 수정 이슈
+## `markdown-preview.nvim` 새로고침 패치
 
 - 미리보기 URL이 `/page/{bufnr}`에서 `/{bufnr}`로 바뀐 뒤 새로고침하면
-  404 또는 `/NaN`이 되는 문제를 설치된 플러그인의 라우터에서 수정했다.
-- 마지막 브라우저 탭이 닫힌 후 10초 동안 재연결이 없으면 미리보기 서버가
-  자동 종료되도록 수정했다.
-- 수정 위치는 `~/.local/share/nvim/lazy/markdown-preview.nvim`이며, 다른 PC나
-  플러그인 업데이트에는 자동으로 반영되지 않는다.
+  404 또는 `/NaN`이 되는 문제를 막기 위해, 짧은 주소를 `/page/{bufnr}`로
+  임시 리다이렉트한다.
+- `lua/config/markdown_preview.lua`가 시작 시와 플러그인 빌드 후 설치된
+  `app/routes.js`에 패치를 적용한다. 이미 적용된 패치는 중복 삽입하지 않는다.
+- 실행 중인 미리보기 서버에는 재시작 후 반영된다.
+- 마지막 미리보기 탭의 연결이 끊긴 후 10초 동안 재연결이 없으면 서버도
+  종료한다. 새로고침으로 재연결되면 종료 예약을 취소하며, 다른 미리보기 탭이
+  연결되어 있으면 서버를 유지한다. 이 패치도 시작 시와 빌드 후 `app/server.js`에 적용한다.

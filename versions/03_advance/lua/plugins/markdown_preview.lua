@@ -6,7 +6,9 @@ return {
         "MarkdownPreviewToggle",
     },
     ft = { "markdown" },
-    build = "cd app && npm install",
+    build = function(plugin)
+        require("config.markdown_preview").build(plugin)
+    end,
 
     init = function(plugin)
         require("config.markdown_preview").repair_on_start(plugin)
