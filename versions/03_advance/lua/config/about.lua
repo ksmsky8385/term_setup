@@ -187,6 +187,7 @@ function M.open(opts)
         "    Space ff           파일명 검색",
         "    Space fg           프로젝트 전체 문자열 검색",
         "    Space bb           버퍼 선택",
+        "    Tab                일반 파일 경로를 창 상단에 표시/숨기기 (Esc로 닫기)",
         "    Space q / Q        현재 버퍼 닫기/강제 닫기",
         "    Space Ctrl-q       현재 창 닫기",
         "",

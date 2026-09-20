@@ -20,6 +20,13 @@ end, {
 vim.cmd([[nnoremenu <silent> 500.10 PopUp.Toggle\ Mode <Cmd>startinsert<CR>]])
 vim.cmd([[inoremenu <silent> 500.10 PopUp.Toggle\ Mode <Cmd>stopinsert<CR>]])
 
+vim.keymap.set("n", "<Tab>", function()
+    require("config.file_path").toggle()
+end, {
+    silent = true,
+    desc = "Toggle current file path preview",
+})
+
 local floating = require("config.floating")
 local empty_buffers = require("config.empty_buffers")
 
