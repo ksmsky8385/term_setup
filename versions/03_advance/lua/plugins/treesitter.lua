@@ -2,6 +2,9 @@ local M = {
     "nvim-treesitter/nvim-treesitter",
     branch = "master",
     lazy = false,
+    init = function()
+        require("config.treesitter_compat").setup()
+    end,
 }
 
 M.opts = {
