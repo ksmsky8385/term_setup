@@ -4,6 +4,7 @@ M.save_path = vim.fn.stdpath("state") .. "/sidebar-settings.json"
 
 local defaults = {
     nvim_tree_position = "left",
+    nvim_tree_mode = "split",
     nvim_tree_width = 30,
     agentic_position = "right",
     agentic_width = 55,
@@ -19,6 +20,9 @@ local limits = {
 local values
 
 local function valid_value(name, value)
+    if name == "nvim_tree_mode" then
+        return value == "split" or value == "float"
+    end
     if name == "nvim_tree_position" or name == "agentic_position" then
         return value == "left" or value == "right"
     end
@@ -250,6 +254,52 @@ function M.range(name)
     return limits[name] and vim.deepcopy(limits[name]) or nil
 end
 
+function M.tree_float_config()
+    local width = math.max(1, math.min(M.get("nvim_tree_width"), vim.o.columns - 2))
+    return {
+        relative = "editor",
+        border = "rounded",
+        width = width,
+        height = math.max(1, vim.o.lines - vim.o.cmdheight - 4),
+        row = 1,
+        col = M.get("nvim_tree_position") == "right"
+            and math.max(0, vim.o.columns - width - 2) or 0,
+    }
+end
+
+function M.refresh_tree_float()
+    local ok, api = pcall(require, "nvim-tree.api")
+    local win = ok and api.tree.winid()
+    if win and vim.api.nvim_win_is_valid(win)
+        and vim.api.nvim_win_get_config(win).relative ~= "" then
+        vim.api.nvim_win_set_config(win, M.tree_float_config())
+    end
+end
+
+local function apply_nvim_tree_mode(mode)
+    local ok, config = pcall(require, "nvim-tree.config")
+    if not ok or not config.g then
+        return
+    end
+    local api = require("nvim-tree.api")
+    local visible = api.tree.is_visible()
+    local current_win = vim.api.nvim_get_current_win()
+    local focused = current_win == api.tree.winid()
+    if visible then
+        api.tree.close()
+    end
+    config.g.view.float.enable = mode == "float"
+    if mode == "split" then
+        api.tree.resize({ absolute = values.nvim_tree_width })
+    end
+    if visible then
+        api.tree.open({ focus = focused })
+        if not focused and vim.api.nvim_win_is_valid(current_win) then
+            vim.api.nvim_set_current_win(current_win)
+        end
+    end
+end
+
 function M.set(name, value)
     load()
 
@@ -264,7 +314,16 @@ function M.set(name, value)
     values[name] = value
     save()
 
-    if name == "nvim_tree_position" then
+    if name == "nvim_tree_mode" then
+        apply_nvim_tree_mode(value)
+    elseif (name == "nvim_tree_position" or name == "nvim_tree_width")
+        and values.nvim_tree_mode == "float" then
+        local ok, config = pcall(require, "nvim-tree.config")
+        if ok and config.g then
+            config.g.view.side = values.nvim_tree_position
+        end
+        M.refresh_tree_float()
+    elseif name == "nvim_tree_position" then
         apply_nvim_tree_position(value)
     elseif name == "nvim_tree_width" then
         apply_nvim_tree_width(value)

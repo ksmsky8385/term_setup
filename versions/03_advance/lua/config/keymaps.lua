@@ -730,6 +730,7 @@ end, {
 
 local function focus_or_float(direction, normal)
     return function()
+        if require("config.tree_focus").focus(direction) then return end
         if not floating.focus(direction) then vim.cmd("wincmd " .. normal) end
     end
 end
@@ -744,10 +745,17 @@ vim.keymap.set("n", "<C-Down>", focus_or_float("down", "j"), { noremap = true, s
 vim.keymap.set("n", "<C-Up>", focus_or_float("up", "k"), { noremap = true, silent = true })
 vim.keymap.set("n", "<C-Right>", focus_or_float("right", "l"), { noremap = true, silent = true })
 
-vim.keymap.set("i", "<C-Left>", "<Esc><C-w>h", { noremap = true, silent = true })
-vim.keymap.set("i", "<C-Down>", "<Esc><C-w>j", { noremap = true, silent = true })
-vim.keymap.set("i", "<C-Up>", "<Esc><C-w>k", { noremap = true, silent = true })
-vim.keymap.set("i", "<C-Right>", "<Esc><C-w>l", { noremap = true, silent = true })
+local function insert_focus_or_float(direction, normal)
+    return function()
+        vim.cmd("stopinsert")
+        vim.schedule(focus_or_float(direction, normal))
+    end
+end
+
+vim.keymap.set("i", "<C-Left>", insert_focus_or_float("left", "h"), { noremap = true, silent = true })
+vim.keymap.set("i", "<C-Down>", insert_focus_or_float("down", "j"), { noremap = true, silent = true })
+vim.keymap.set("i", "<C-Up>", insert_focus_or_float("up", "k"), { noremap = true, silent = true })
+vim.keymap.set("i", "<C-Right>", insert_focus_or_float("right", "l"), { noremap = true, silent = true })
 
 local function terminal_focus_or_float(direction, normal)
     return function()

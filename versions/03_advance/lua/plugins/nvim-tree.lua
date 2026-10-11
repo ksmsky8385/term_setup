@@ -290,6 +290,7 @@ return {
                 " Navigation",
                 " Tab          Preview path/file or toggle folder",
                 " Enter / o    Open file or change cwd",
+                " O            Open with OS default app",
                 " Double-click Same action as Tab/Enter by node type",
                 " Ctrl+double   Run the opposite mouse action",
                 " Esc          Close preview/help",
@@ -536,6 +537,13 @@ return {
 
                 vim.keymap.set(
                     "n",
+                    "O",
+                    api.node.run.system,
+                    opts("Open with OS default app")
+                )
+
+                vim.keymap.set(
+                    "n",
                     "o",
                     function()
                         open_node()
@@ -668,6 +676,11 @@ return {
                 side = sidebar_settings.get("nvim_tree_position"),
                 width = sidebar_settings.get("nvim_tree_width"),
                 preserve_window_proportions = true,
+                float = {
+                    enable = sidebar_settings.get("nvim_tree_mode") == "float",
+                    quit_on_focus_loss = false,
+                    open_win_config = sidebar_settings.tree_float_config,
+                },
             },
 
             renderer = {
@@ -716,6 +729,10 @@ return {
         })
 
         restore_nvim_tree_highlights()
+
+        vim.api.nvim_create_autocmd("VimResized", {
+            callback = sidebar_settings.refresh_tree_float,
+        })
 
         vim.api.nvim_create_autocmd("ColorScheme", {
             callback = restore_nvim_tree_highlights,

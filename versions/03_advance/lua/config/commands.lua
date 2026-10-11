@@ -194,6 +194,11 @@ vim.api.nvim_create_user_command("TreeToggle", function()
     vim.schedule(function()
         local sidebar_settings = require("config.sidebar_settings")
 
+        if sidebar_settings.get("nvim_tree_mode") == "float" then
+            sidebar_settings.refresh_tree_float()
+            return
+        end
+
         vim.cmd("wincmd =")
 
         if api.tree.is_visible() then

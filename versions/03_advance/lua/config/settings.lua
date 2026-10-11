@@ -199,6 +199,16 @@ local function open_sidebar()
             action = open_main,
         },
         {
+            label = "File tree mode: " .. sidebar_settings.get("nvim_tree_mode"),
+            action = function()
+                sidebar_settings.set(
+                    "nvim_tree_mode",
+                    sidebar_settings.get("nvim_tree_mode") == "split" and "float" or "split"
+                )
+                M.open("sidebar")
+            end,
+        },
+        {
             label = "Tree: " .. sidebar_settings.get("nvim_tree_position"),
             action = function()
                 local position = sidebar_settings.get("nvim_tree_position")
