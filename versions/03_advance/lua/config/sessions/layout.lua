@@ -158,6 +158,7 @@ buffer_descriptor = function(buf, win)
     if buftype == "terminal" then
         return {
             kind = "terminal",
+            terminal_key = tostring(buf),
             cwd = terminal_cwd(buf, win),
             shell = vim.o.shell,
         }
@@ -235,6 +236,8 @@ local function serialize_layout(node, descriptors, current_win, next_leaf)
                     current = win == current_win,
                     geometry = window_geometry(win),
                     window_order = window_picker_order(win),
+                    window_buffers = require("config.winbar").snapshot(win),
+                    window_buffer_current = vim.fn.index(require("config.winbar").items(win), buf) + 1,
                 },
                 buffer_descriptor(buf, win)
             )
@@ -426,9 +429,10 @@ local function restore_terminal(win, descriptor)
     local ok, terminal = pcall(require, "config.terminal")
 
     if ok then
-        local buf = terminal.restore_buffer(descriptor, win)
+        local buf = require("config.winbar").restore_terminal(descriptor.terminal_key, descriptor)
         if valid_buffer(buf) then
             vim.api.nvim_win_set_buf(win, buf)
+            if vim.b[buf].pending_terminal_restore then terminal.start_pending(win) end
         end
     else
         pcall(vim.cmd, "terminal")
@@ -613,6 +617,12 @@ local function restore_tab(tab)
     restore_window_orders(leaf_windows, tab.windows or {})
 
     for leaf, descriptor in pairs(tab.windows or {}) do
+        if valid_window(leaf_windows[leaf]) then
+            require("config.winbar").restore_window(leaf_windows[leaf], descriptor.window_buffers, descriptor.window_buffer_current)
+        end
+    end
+
+    for leaf, descriptor in pairs(tab.windows or {}) do
         if descriptor.current and valid_window(leaf_windows[leaf]) then
             pcall(vim.api.nvim_set_current_win, leaf_windows[leaf])
             break
@@ -624,7 +634,7 @@ local function cleanup_hidden_empty_buffers()
     empty_buffers.cleanup()
 end
 
-function M.restore(snapshot)
+local function restore_layout(snapshot)
     if type(snapshot) ~= "table" or snapshot.version ~= VERSION or type(snapshot.tabs) ~= "table" then
         return false
     end
@@ -654,6 +664,18 @@ function M.restore(snapshot)
     cleanup_hidden_empty_buffers()
 
     return true
+end
+
+function M.restore(snapshot)
+    if type(snapshot) ~= "table" or snapshot.version ~= VERSION or type(snapshot.tabs) ~= "table" then
+        return false
+    end
+    local winbar = require("config.winbar")
+    winbar.begin_restore()
+    local ok, result = pcall(restore_layout, snapshot)
+    winbar.end_restore()
+    if not ok then error(result) end
+    return result
 end
 
 return M

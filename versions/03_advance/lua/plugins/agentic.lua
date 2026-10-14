@@ -313,6 +313,32 @@ return {
             pattern = "Agentic*",
             callback = function(args)
                 local leader = vim.g.mapleader or "\\"
+                if vim.bo[args.buf].filetype == "AgenticChat" then
+                    vim.keymap.set("n", "gF", function()
+                        local win = vim.api.nvim_get_current_win()
+                        local buf = vim.api.nvim_get_current_buf()
+                        local view = vim.fn.winsaveview()
+                        local ok, err = pcall(vim.cmd, "normal! gF")
+
+                        -- Agentic's buffer guard briefly replaces the chat
+                        -- buffer, then redirects the file to the editor. Restore
+                        -- the chat view after that scheduled redirect completes.
+                        vim.schedule(function()
+                            if vim.api.nvim_win_is_valid(win)
+                                and vim.api.nvim_win_get_buf(win) == buf then
+                                vim.api.nvim_win_call(win, function()
+                                    vim.fn.winrestview(view)
+                                end)
+                            end
+                        end)
+                        if not ok then
+                            vim.notify(tostring(err), vim.log.levels.WARN)
+                        end
+                    end, {
+                        buffer = args.buf,
+                        desc = "Open file at line and preserve Agentic scroll",
+                    })
+                end
                 local blocked_leader_mappings = {
                     leader .. "h",
                 }

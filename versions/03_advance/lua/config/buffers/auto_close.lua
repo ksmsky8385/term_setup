@@ -20,6 +20,7 @@ local function can_close(buf)
         and vim.api.nvim_buf_is_valid(buf)
         and state.movable(buf)
         and visibility.all_visible_count(buf) == 0
+        and not require("config.winbar").has_reference(buf)
         and not has_floating_assignment(buf)
         and state.delete_blocker(buf, false) == nil
 end

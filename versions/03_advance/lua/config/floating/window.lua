@@ -7,6 +7,8 @@ local title_for_buffer
 local configure_window
 
 local AUGROUP_PREFIX = "ConfigFloatingSlot"
+-- Editor panes stay below Telescope and other transient dialogs (default 50).
+local EDITOR_ZINDEX = 40
 
 local function floating_size()
     local width = math.floor(vim.o.columns * 0.82)
@@ -26,13 +28,14 @@ local function floating_config(slot_id)
 
     return {
         relative = "editor",
+        zindex = EDITOR_ZINDEX,
         width = width,
         height = height,
         row = math.floor((vim.o.lines - height) / 2),
         col = math.floor((vim.o.columns - width) / 2),
         style = "minimal",
         border = "rounded",
-        title = " [" .. title .. "] ",
+        title = require("config.editor_settings").get("winbar") and "" or (" [" .. title .. "] "),
         title_pos = "center",
     }
 end
@@ -60,11 +63,35 @@ local function pane_title(slot_id, pane_id, buf)
     return " [" .. state.label(slot_id) .. "]" .. suffix .. " " .. title_for_buffer(slot_id, buf):gsub("^ %[[^%]]+%] ", "")
 end
 
+local function modified_title(title, buf, win)
+    if require("config.editor_settings").get("winbar") then
+        if not state.valid_window(win) or vim.wo[win].winbar ~= '' then return '' end
+        local slot = state.window_slot_id(win)
+        if not slot then return '' end
+        local label = '[' .. (tostring(slot) == '`' and '~' or tostring(slot)) .. ']'
+        local item = state.slots[tostring(slot)]
+        if item and item.panes and vim.tbl_count(item.panes) > 1 then
+            label = label .. '[' .. state.window_pane_id(win) .. ']'
+        end
+        return ' ' .. label .. ' '
+    end
+    if not state.valid_buffer(buf) or vim.bo[buf].buftype ~= '' or not vim.bo[buf].modified then
+        return title
+    end
+    local added, removed = require('config.buffer_changes').count(buf)
+    local chunks = {{title:gsub(' $', ''), 'FloatTitle'}}
+    if added > 0 then chunks[#chunks + 1] = {' +' .. added, 'GitSignsAdd'} end
+    if removed > 0 then chunks[#chunks + 1] = {' -' .. removed, 'GitSignsDelete'} end
+    if added == 0 and removed == 0 then chunks[#chunks + 1] = {' ●', 'FloatTitle'} end
+    chunks[#chunks + 1] = {' ', 'FloatTitle'}
+    return chunks
+end
+
 local function pane_config(slot_id, pane_id, rect, buf)
     return {
-        relative = "editor", width = rect.width, height = rect.height,
+        relative = "editor", zindex = EDITOR_ZINDEX, width = rect.width, height = rect.height,
         row = rect.row, col = rect.col, style = "minimal", border = "single",
-        title = pane_title(slot_id, pane_id, buf), title_pos = "center",
+        title = modified_title(pane_title(slot_id, pane_id, buf), buf, state.slot(slot_id).panes[pane_id].win), title_pos = "center",
     }
 end
 
@@ -74,8 +101,10 @@ function M.apply_layout(slot_id)
     for pane_id, pane in pairs(item.panes) do
         if state.valid_window(pane.win) and rects[pane_id] then
             pcall(vim.api.nvim_win_set_config, pane.win, pane_config(slot_id, pane_id, rects[pane_id], vim.api.nvim_win_get_buf(pane.win)))
+            require("config.winbar").bind(pane.win, pane)
         end
     end
+    require("config.winbar").refresh()
 end
 
 function M.open_pane(slot_id, pane_id, buf)
@@ -95,6 +124,7 @@ function M.open_pane(slot_id, pane_id, buf)
     pane.win, pane.buf = win, buf
     state.mark_pane(win, buf, slot_id, pane_id)
     configure_window(win)
+    require('config.winbar').bind(win, pane)
     if vim.b[buf].pending_terminal_restore then
         require("config.terminal").start_pending(win)
         M.update_title(slot_id)
@@ -142,7 +172,7 @@ title_for_buffer = function(slot_id, buf)
         local path = vim.api.nvim_buf_get_name(buf)
 
         if vim.bo[buf].buftype == "terminal" or vim.b[buf].pending_terminal_restore then
-            name = vim.fn.fnamemodify(vim.o.shell, ":t") .. " [Terminal]"
+            name = "Terminal [" .. vim.fn.fnamemodify(vim.o.shell, ":t"):gsub("%.exe$", "") .. "]"
         elseif path ~= "" then
             name = vim.fn.fnamemodify(path, ":t")
         elseif vim.bo[buf].filetype ~= "alpha" and vim.bo[buf].filetype ~= state.SLOT_FILETYPE then
@@ -184,7 +214,7 @@ function M.update_title(slot_id)
         for pane_id, pane in pairs(item.panes) do
             if state.valid_window(pane.win) then
                 configure_window(pane.win)
-                pcall(vim.api.nvim_win_set_config, pane.win, { title = pane_title(slot_id, pane_id, vim.api.nvim_win_get_buf(pane.win)), title_pos = "center" })
+                pcall(vim.api.nvim_win_set_config, pane.win, { title = modified_title(pane_title(slot_id, pane_id, vim.api.nvim_win_get_buf(pane.win)), vim.api.nvim_win_get_buf(pane.win), pane.win), title_pos = "center" })
             end
         end
         return
@@ -194,7 +224,7 @@ function M.update_title(slot_id)
     configure_window(item.win)
 
     pcall(vim.api.nvim_win_set_config, item.win, {
-        title = title_for_buffer(slot_id, vim.api.nvim_win_get_buf(item.win)),
+        title = modified_title(title_for_buffer(slot_id, vim.api.nvim_win_get_buf(item.win)), vim.api.nvim_win_get_buf(item.win), item.win),
         title_pos = "center",
     })
 end
@@ -311,6 +341,7 @@ function M.open(slot_id, buf)
     state.mark_window(win, slot_id)
     state.mark_buffer(buf, slot_id)
     configure_window(win)
+    require("config.winbar").bind(win, item)
     M.update_title(slot_id)
     M.restore_view(item)
 
@@ -349,6 +380,21 @@ vim.api.nvim_create_autocmd("VimResized", {
         for slot_id, item in pairs(state.slots) do
             if item.panes then M.apply_layout(slot_id) end
         end
+    end,
+})
+
+vim.api.nvim_create_autocmd({'TextChanged', 'TextChangedI', 'BufModifiedSet', 'BufWritePost'}, {
+    group = vim.api.nvim_create_augroup('ConfigFloatingModifiedTitles', {clear = true}),
+    callback = function(args)
+        vim.schedule(function()
+            for slot_id, item in pairs(state.slots) do
+                local matches = state.valid_window(item.win) and vim.api.nvim_win_get_buf(item.win) == args.buf
+                for _, pane in pairs(item.panes or {}) do
+                    matches = matches or (state.valid_window(pane.win) and vim.api.nvim_win_get_buf(pane.win) == args.buf)
+                end
+                if matches then M.update_title(slot_id) end
+            end
+        end)
     end,
 })
 

@@ -1,0 +1,28 @@
+vim.opt.rtp:prepend(vim.fn.getcwd())
+require('config.toggle_state').write('editor_winbar',true)
+local bar=require('config.winbar')
+bar.setup()
+require('config.keymaps')
+local buf=vim.api.nvim_get_current_buf()
+vim.api.nvim_buf_set_name(buf, vim.fn.tempname()..'.txt')
+bar.track(vim.api.nvim_get_current_win())
+local source=vim.api.nvim_get_current_win()
+for _,key in ipairs({'<leader>ws','<leader>wv'}) do
+ vim.api.nvim_set_current_win(source)
+ local mapping=vim.fn.maparg(key,'n',false,true)
+ assert(type(mapping.callback)=='function')
+ mapping.callback()
+ local win=vim.api.nvim_get_current_win()
+ assert(win~=source)
+ assert(vim.api.nvim_buf_get_name(vim.api.nvim_win_get_buf(win))=='')
+ assert(#bar.items(win)==0, 'split inherited a file')
+ assert(vim.tbl_contains(bar.items(source),buf), 'source history was lost')
+end
+for _,name in ipairs({'Vertical','Horizontal'}) do
+ vim.api.nvim_set_current_win(source)
+ vim.cmd('emenu PopUp.Split\\ '..name)
+ local win=vim.api.nvim_get_current_win()
+ assert(win~=source and #bar.items(win)==0, 'popup split did not create an empty window')
+end
+print('PASS: ws/wv split to blank buffer and empty history; source history preserved')
+vim.cmd('qa!')

@@ -133,6 +133,34 @@ local function is_empty_unnamed_buffer(buf)
         and vim.api.nvim_buf_get_lines(buf, 0, 1, false)[1] == ""
 end
 
+function M.on_tab_click(tabnr, clicks, button)
+    if button ~= "l" or clicks ~= 2 then
+        return
+    end
+
+    local tabpage = vim.api.nvim_list_tabpages()[tabnr]
+    if tabpage and vim.api.nvim_tabpage_is_valid(tabpage) then
+        vim.api.nvim_set_current_tabpage(tabpage)
+    end
+end
+
+-- Buffer-local mouse mappings (dashboard/tree) must let the tabline consume
+-- its own event instead of interpreting it as a click inside the buffer.
+function M.forward_tabline_double_click()
+    local mouse = vim.fn.getmousepos()
+    local visible = vim.o.showtabline == 2
+        or (vim.o.showtabline == 1 and tab_count() > 1)
+    -- getmousepos() may report the current window's ID for the tabline;
+    -- only its screen row identifies this area reliably.
+    if not visible or mouse.screenrow ~= 1 then
+        return false
+    end
+
+    local key = vim.api.nvim_replace_termcodes("<2-LeftMouse>", true, false, true)
+    vim.api.nvim_feedkeys(key, "ni", false)
+    return true
+end
+
 function M.tabline()
     local parts = {}
     local current = vim.fn.tabpagenr()
@@ -142,7 +170,8 @@ function M.tabline()
                 and "%#ConfigTabActive#"
             or "%#ConfigTabInactive#"
 
-        table.insert(parts, highlight .. "%" .. tabnr .. "T " .. tab_label(tabnr) .. " ")
+        table.insert(parts, highlight .. "%" .. tabnr
+            .. "@v:lua.ConfigTabClick@ " .. tab_label(tabnr):gsub("%%", "%%%%") .. " %X")
         table.insert(parts, "%#ConfigTabFill# ")
     end
 
@@ -153,6 +182,7 @@ end
 
 function M.setup()
     apply_highlights()
+    _G.ConfigTabClick = M.on_tab_click
     vim.o.showtabline = 1
     vim.o.tabline = "%!v:lua.require('config.tabs').tabline()"
 

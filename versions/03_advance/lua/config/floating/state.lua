@@ -170,26 +170,20 @@ end
 function M.assigned_slots_by_buffer()
     local assigned = {}
 
+    local enabled = require('config.editor_settings').get('winbar')
     for slot_id, item in pairs(M.slots) do
-        if item.panes then
-            local multiple = vim.tbl_count(item.panes) > 1
-            for pane_id, pane in pairs(item.panes) do
-                if M.valid_buffer(pane.buf) and vim.bo[pane.buf].filetype ~= M.SLOT_FILETYPE then
-                    assigned[pane.buf] = assigned[pane.buf] or {}
-                    table.insert(assigned[pane.buf], { slot = slot_id, label = M.label(slot_id) .. (multiple and ("][" .. pane_id) or ""), rank = M.slot_rank(slot_id) })
+        local multiple = item.panes and vim.tbl_count(item.panes) > 1
+        for pane_id, pane in pairs(item.panes or {A = item}) do
+            local history = enabled and (M.valid_window(pane.win) and require('config.winbar').items(pane.win) or pane.winbar_items) or {}
+            local candidates = vim.deepcopy(history or {})
+            if pane.buf and not vim.tbl_contains(candidates, pane.buf) then candidates[#candidates + 1] = pane.buf end
+            for _, buf in ipairs(candidates) do
+                if M.valid_buffer(buf) and vim.bo[buf].filetype ~= M.SLOT_FILETYPE then
+                    assigned[buf] = assigned[buf] or {}
+                    table.insert(assigned[buf], {slot = slot_id, label = M.label(slot_id) .. (multiple and ("][" .. pane_id) or ''), rank = M.slot_rank(slot_id)})
                 end
             end
-            goto continue
         end
-        if M.valid_buffer(item.buf) and vim.bo[item.buf].filetype ~= M.SLOT_FILETYPE then
-            assigned[item.buf] = assigned[item.buf] or {}
-            table.insert(assigned[item.buf], {
-                slot = slot_id,
-                label = M.label(slot_id),
-                rank = M.slot_rank(slot_id),
-            })
-        end
-        ::continue::
     end
 
     for _, slots in pairs(assigned) do
@@ -209,10 +203,10 @@ function M.has_assignment(buf)
     for _, item in pairs(M.slots) do
         if item.panes then
             for _, pane in pairs(item.panes) do
-                if pane.buf == buf then return true end
+                if pane.buf == buf or (require("config.editor_settings").get("winbar") and vim.tbl_contains(pane.winbar_items or {}, buf)) then return true end
             end
         end
-        if item.buf == buf then
+        if item.buf == buf or (require("config.editor_settings").get("winbar") and vim.tbl_contains(item.winbar_items or {}, buf)) then
             return true
         end
     end
@@ -286,10 +280,16 @@ function M.current_slots()
     local entries = {}
 
     for slot_id, item in pairs(M.slots) do
+        if item.winbar_items and not item.panes then require('config.floating.layout').ensure(item) end
         if item.panes then
             local panes = {}
             for pane_id, pane in pairs(item.panes) do
-                table.insert(panes, saved_pane(pane_id, pane.buf))
+                local saved = saved_pane(pane_id, pane.buf)
+                local bar = require('config.winbar')
+                local history = M.valid_window(pane.win) and bar.items(pane.win) or pane.winbar_items or {}
+                saved.winbar = bar.snapshot_items(history)
+                saved.winbar_active = vim.fn.index(history, pane.buf) + 1
+                table.insert(panes, saved)
             end
             table.sort(panes, function(a, b) return a.id < b.id end)
             if #panes > 0 then

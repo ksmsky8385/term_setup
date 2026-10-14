@@ -2,11 +2,13 @@ local state = require("config.toggle_state")
 local M = {}
 
 M.options = {
+    { name = "winbar", label = "Window buffer bar" },
+    { name = "winbar_compress", label = "Compress buffer names", parent = "winbar" },
     { name = "autopairs", label = "Auto pairing" },
     { name = "line_numbers", label = "Line numbers", choices = { "absolute", "relative", "hybrid", "off" } },
     { name = "wrap", label = "Wrap long lines" },
-    { name = "linebreak", label = "Wrap at word boundaries (requires wrap)" },
-    { name = "breakindent", label = "Indent wrapped lines (requires wrap)" },
+    { name = "linebreak", label = "Wrap at word boundaries", parent = "wrap" },
+    { name = "breakindent", label = "Indent wrapped lines", parent = "wrap" },
     { name = "cursorline", label = "Highlight cursor line" },
     { name = "cursorcolumn", label = "Highlight cursor column" },
     { name = "list", label = "Show whitespace" },
@@ -29,7 +31,7 @@ local function apply_window(win)
     vim.wo[win].number = mode == "absolute" or mode == "hybrid"
     vim.wo[win].relativenumber = mode == "relative" or mode == "hybrid"
     for _, option in ipairs(M.options) do
-        if option.name ~= "autopairs" and option.name ~= "line_numbers" then
+        if option.name ~= "autopairs" and option.name ~= "line_numbers" and option.name ~= "winbar" and option.name ~= "winbar_compress" then
             vim.wo[win][option.name] = M.get(option.name)
         end
     end
@@ -50,6 +52,7 @@ end
 function M.cycle(name)
     for _, option in ipairs(M.options) do
         if option.name == name then
+            if option.parent and not M.get(option.parent) then return end
             local value = M.get(name)
             if option.choices then
                 for index, choice in ipairs(option.choices) do
@@ -64,6 +67,8 @@ function M.cycle(name)
             state.write("editor_" .. name, value)
             if name == "autopairs" then
                 M.apply_autopairs()
+            elseif name == "winbar" or name == "winbar_compress" then
+                require("config.winbar").refresh()
             else
                 for _, win in ipairs(vim.api.nvim_list_wins()) do
                     apply_window(win)

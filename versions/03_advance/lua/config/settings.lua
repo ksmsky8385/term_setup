@@ -39,7 +39,51 @@ local function apply_theme(theme, notify)
     return false
 end
 
+-- Telescope's descending layout places later entries nearer the prompt.
+-- Keep maintenance/detail actions at lower indices, common actions last.
+local menu_order = {
+    ["Settings"] = {"Lazy settings", "Tree-sitter settings", "Snippet settings", "Debugger settings", "LSP settings", "Sidebar settings", "Buffer settings", "Change theme", "Editor settings"},
+    ["Settings > Editor"] = {"Spell checking (spelllang)", "Auto pairing", "Highlight cursor column", "Highlight cursor line", "Show whitespace", "Indent wrapped lines", "Wrap at word boundaries", "Wrap long lines", "Line numbers", "Window buffer bar"},
+    ["Settings > Buffer"] = {"End-of-buffer ~ markers", "Auto close buffer", "Auto save"},
+    ["Settings > Sidebar"] = {"Agentic prompt height", "Agentic width", "Agentic", "File tree width", "Tree", "File tree mode"},
+    ["Settings > Tree-sitter"] = {"Parser remove", "Parser update", "Parser install", "Parser list"},
+    ["Settings > LSP"] = {"Open Mason", "Update registry", "Server remove", "Server install", "Server list"},
+    ["Settings > Debugger"] = {"Show runtime path", "Open Mason", "Update registry", "Adapter remove", "Adapter install", "Adapter list", "Args prompt"},
+    ["Settings > Snippets"] = {"Reload snippets", "Friendly snippets", "Completion source", "Snippets"},
+}
+
 local function picker(title, entries, opts)
+    local order = menu_order[title]
+    if order then
+        local ranks = { ["< Back"] = 0 }
+        for index, name in ipairs(order) do ranks[name] = index end
+        table.sort(entries, function(a, b)
+            local left = a.label:match("^(.-): ") or a.label
+            local right = b.label:match("^(.-): ") or b.label
+            return (ranks[left] or 0) < (ranks[right] or 0)
+        end)
+    end
+    -- Descending Telescope renders later input entries above earlier ones.
+    -- Put children first so the parent appears above them on screen.
+    local grouped, children = {}, {}
+    for _, entry in ipairs(entries) do
+        if entry.parent then
+            children[entry.parent] = children[entry.parent] or {}
+            table.insert(children[entry.parent], entry)
+        end
+    end
+    for _, entry in ipairs(entries) do
+        if not entry.parent then
+            for _, child in ipairs(children[entry.key or entry.label] or {}) do
+                child.label = '  ㄴ ' .. child.label
+                grouped[#grouped + 1] = child
+            end
+            grouped[#grouped + 1] = entry
+        end
+    end
+    entries = grouped
+    opts = opts or {}
+    opts.picker_opts = vim.tbl_extend("force", opts.picker_opts or {}, {sorting_strategy = "descending"})
     telescope_picker.action_picker(title, entries, opts)
 end
 
@@ -109,6 +153,8 @@ local function open_editor()
         local value = editor.get(option.name)
         local status = type(value) == "boolean" and (value and "enabled" or "disabled") or value
         table.insert(entries, {
+            key = option.name, parent = option.parent,
+            disabled = option.parent and not editor.get(option.parent) or false,
             label = option.label .. ": " .. status,
             action = function()
                 editor.cycle(option.name)
@@ -576,6 +622,7 @@ local function open_snippets()
             action = open_main,
         },
         {
+            key = "snippets",
             label = "Snippets: "
                 .. (state.snippets and "enabled" or "disabled"),
             action = function()
@@ -584,6 +631,7 @@ local function open_snippets()
             end,
         },
         {
+            parent = "snippets", disabled = not state.snippets,
             label = "Completion source: "
                 .. (state.snippet_source and "enabled" or "disabled"),
             action = function()
@@ -592,6 +640,7 @@ local function open_snippets()
             end,
         },
         {
+            parent = "snippets", disabled = not state.snippets,
             label = "Friendly snippets: "
                 .. (state.friendly_snippets and "enabled" or "disabled"),
             action = function()
@@ -600,6 +649,7 @@ local function open_snippets()
             end,
         },
         {
+            parent = "snippets", disabled = not state.snippets,
             label = "Reload snippets",
             action = function()
                 completion.reload_snippets()

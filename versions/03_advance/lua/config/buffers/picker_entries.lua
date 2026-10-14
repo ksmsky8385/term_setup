@@ -38,6 +38,17 @@ local function visible_tab_labels_by_buffer()
                     table.insert(tab_labels[buf], window_label)
                 end
             end
+            if window_label ~= '' and require('config.editor_settings').get('winbar')
+                and not (ok_floating and floating.is_slot_window(win)) then
+                for _, assigned in ipairs(require('config.winbar').items(win)) do
+                    if state.valid_listed(assigned) then
+                        tab_labels[assigned] = tab_labels[assigned] or {}
+                        if not vim.tbl_contains(tab_labels[assigned], window_label) then
+                            table.insert(tab_labels[assigned], window_label)
+                        end
+                    end
+                end
+            end
         end
 
         vim.api.nvim_set_current_tabpage(previous_tabpage)

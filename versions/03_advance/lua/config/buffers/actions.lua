@@ -82,6 +82,10 @@ end
 function M.delete_current(force)
     local current = vim.api.nvim_get_current_buf()
     local current_win = vim.api.nvim_get_current_win()
+    if require("config.editor_settings").get("winbar")
+        and vim.tbl_contains(require("config.winbar").items(current_win), current) then
+        return require("config.winbar").close(current_win, current, force)
+    end
 
     if
         windows.all_visible_count(current) > 1
@@ -117,6 +121,11 @@ end
 
 function M.delete_current_to_hidden(force)
     local current = vim.api.nvim_get_current_buf()
+    local win = vim.api.nvim_get_current_win()
+    if require("config.editor_settings").get("winbar")
+        and vim.tbl_contains(require("config.winbar").items(win), current) then
+        return require("config.winbar").close(win, current, force)
+    end
     local replacement = M.hidden_replacement(current)
 
     if not replacement then

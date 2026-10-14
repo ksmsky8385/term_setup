@@ -14,6 +14,8 @@ local defaults = {
     editor_cursorcolumn = false,
     editor_list = true,
     editor_spell = false,
+    editor_winbar = true,
+    editor_winbar_compress = false,
 }
 
 local values

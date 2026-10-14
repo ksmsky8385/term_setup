@@ -150,8 +150,11 @@ function M.restore_group(saved)
     item.panes, item.layout, item.geometry = {}, vim.deepcopy(saved.layout), vim.deepcopy(saved.geometry)
     for _, saved_pane in ipairs(saved.panes) do
         if type(saved_pane.id) == "string" then
-            local buf
-            if saved_pane.kind == "terminal" then
+            local history, selected = require('config.winbar').restore_items(saved_pane.winbar, saved_pane.winbar_active)
+            local buf = selected
+            if selected then
+                -- The history descriptor already restored the active buffer.
+            elseif saved_pane.kind == "terminal" then
                 buf = require("config.terminal").restore_buffer(saved_pane) or buffers.create_home(slot_id)
             elseif type(saved_pane.file) == "string" and vim.fn.filereadable(saved_pane.file) == 1 then
                 buf = vim.fn.bufadd(saved_pane.file)
@@ -160,7 +163,7 @@ function M.restore_group(saved)
             else
                 buf = buffers.create_home(slot_id)
             end
-            item.panes[saved_pane.id] = { id = saved_pane.id, buf = buf, win = nil }
+            item.panes[saved_pane.id] = { id = saved_pane.id, buf = buf, win = nil, winbar_items = history }
             state.mark_buffer(buf, slot_id)
             vim.b[buf].floating_pane_id = saved_pane.id
         end
@@ -367,7 +370,7 @@ function M.open_buffer(buf, opts)
 
     if old_buf ~= buf then
         state.clear_buffer_slot(old_buf, slot_id)
-        buffers.safe_delete_old(old_buf, opts.force)
+        if not require("config.editor_settings").get("winbar") then buffers.safe_delete_old(old_buf, opts.force) end
     end
 
     buffers.cleanup_empty()
@@ -390,6 +393,7 @@ function M.set_window_buffer(win, buf)
     layout.ensure(item)
     local pane_id = state.window_pane_id(win)
     local pane = item.panes[pane_id]
+    require("config.winbar").bind(win, pane)
     local old_buf = vim.api.nvim_win_get_buf(win)
 
     vim.api.nvim_win_set_buf(win, buf)
@@ -420,7 +424,7 @@ function M.open_file(path, opts)
     return M.open_buffer(buf, opts)
 end
 
-function M.close_current(force)
+function M.close_current(force, skip_winbar)
     local win = vim.api.nvim_get_current_win()
     local slot_id = state.normalize_slot_id(M.window_slot_id(win))
 
@@ -433,6 +437,15 @@ function M.close_current(force)
     local pane_id = state.window_pane_id(win)
     local pane = item.panes[pane_id]
     local buf = vim.api.nvim_win_get_buf(win)
+
+    if not skip_winbar and require('config.editor_settings').get('winbar') then
+        local bar = require('config.winbar')
+        bar.bind(win, pane)
+        if vim.tbl_contains(bar.items(win), buf) then
+            bar.close_entry(win, buf, force)
+            return true
+        end
+    end
 
     if vim.bo[buf].buftype == "terminal" and terminal_job_running(buf) and not force then
         vim.notify("Terminal process is still running. Use Space Q to force.", vim.log.levels.WARN)
@@ -474,6 +487,7 @@ function M.close_current(force)
     end
 
     item.buf = nil
+    item.winbar_items = nil
     item.panes = nil
     item.layout = nil
     item.geometry = nil

@@ -145,6 +145,8 @@ local function apply_terminal_background()
     for _, group in ipairs(transparent_groups) do
         clear_highlight_component(group, "bg")
     end
+    local winbar = package.loaded["config.winbar"]
+    if winbar then winbar.apply_highlights() end
 end
 
 function M.set_terminal_background(enabled)

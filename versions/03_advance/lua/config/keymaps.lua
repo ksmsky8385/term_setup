@@ -61,6 +61,7 @@ local function vertical_split_or_empty()
     require("config.window_picker").remember_window()
     vim.cmd("rightbelow vsplit")
     empty_unlisted_buffer()
+    require("config.winbar").clear_window(vim.api.nvim_get_current_win())
     empty_buffers.cleanup({
         keep = { vim.api.nvim_get_current_buf() },
     })
@@ -75,10 +76,28 @@ local function horizontal_split_or_empty()
     require("config.window_picker").remember_window()
     vim.cmd("rightbelow split")
     empty_unlisted_buffer()
+    require("config.winbar").clear_window(vim.api.nvim_get_current_win())
     empty_buffers.cleanup({
         keep = { vim.api.nvim_get_current_buf() },
     })
 end
+
+local function popup_split(direction)
+    local buf = vim.api.nvim_get_current_buf()
+    if vim.api.nvim_win_get_config(0).relative ~= ""
+        or is_nvim_tree() or is_agentic_filetype(vim.bo[buf].filetype)
+        or (vim.bo[buf].buftype ~= "" and vim.bo[buf].buftype ~= "terminal") then
+        return
+    end
+    if direction == "vertical" then vertical_split_or_empty() else horizontal_split_or_empty() end
+end
+
+vim.api.nvim_create_user_command("WindowSplitVertical", function() popup_split("vertical") end, {})
+vim.api.nvim_create_user_command("WindowSplitHorizontal", function() popup_split("horizontal") end, {})
+vim.cmd([[nnoremenu <silent> 500.20 PopUp.Split\ Vertical <Cmd>WindowSplitVertical<CR>]])
+vim.cmd([[inoremenu <silent> 500.20 PopUp.Split\ Vertical <Cmd>WindowSplitVertical<CR>]])
+vim.cmd([[nnoremenu <silent> 500.21 PopUp.Split\ Horizontal <Cmd>WindowSplitHorizontal<CR>]])
+vim.cmd([[inoremenu <silent> 500.21 PopUp.Split\ Horizontal <Cmd>WindowSplitHorizontal<CR>]])
 
 local function open_dashboard_home()
     pcall(vim.cmd, "DashboardHome")
@@ -257,6 +276,38 @@ local function close_current_window_or_dashboard(current_win)
     end
 end
 
+require("config.winbar").on_empty = close_current_window_or_dashboard
+
+local popup_close_window
+
+local function can_close_from_popup(win)
+    return win and vim.api.nvim_win_is_valid(win)
+        and vim.api.nvim_win_get_config(win).relative == ""
+        and not is_ignored_quit_window(win)
+        and close_target_window_count() > 1
+end
+
+vim.api.nvim_create_user_command("WindowCloseFromPopup", function()
+    local win = popup_close_window or vim.api.nvim_get_current_win()
+    if can_close_from_popup(win) then
+        close_current_window_or_dashboard(win)
+    end
+end, {})
+
+vim.api.nvim_create_autocmd("MenuPopup", {
+    group = vim.api.nvim_create_augroup("ConfigPopupWindowClose", { clear = true }),
+    callback = function()
+        local mouse = vim.fn.getmousepos()
+        popup_close_window = mouse.winid ~= 0 and mouse.winid or vim.api.nvim_get_current_win()
+        if can_close_from_popup(popup_close_window) then
+            vim.cmd([[nnoremenu <silent> 500.22 PopUp.Close\ Window <Cmd>WindowCloseFromPopup<CR>]])
+            vim.cmd([[inoremenu <silent> 500.22 PopUp.Close\ Window <Cmd>WindowCloseFromPopup<CR>]])
+        else
+            pcall(vim.cmd, [[aunmenu PopUp.Close\ Window]])
+        end
+    end,
+})
+
 local function terminal_job_running(buf)
     local job_id = vim.b[buf].terminal_job_id
 
@@ -316,6 +367,25 @@ local function leader_quit(force)
     local current_buf = vim.api.nvim_get_current_buf()
 
     if floating.close_current(force) then
+        return
+    end
+
+    if require('config.editor_settings').get('winbar') and not is_ignored_quit_window(current_win)
+        and (vim.bo[current_buf].buftype == '' or vim.bo[current_buf].buftype == 'terminal') then
+        local bar = require('config.winbar')
+        bar.track(current_win)
+        local function close_if_empty()
+            if vim.api.nvim_win_is_valid(current_win) and #bar.items(current_win) == 0 then
+                close_current_window_or_dashboard(current_win)
+            end
+        end
+        if vim.tbl_contains(bar.items(current_win), current_buf) then
+            bar.close(current_win, current_buf, force, close_if_empty)
+        elseif #bar.items(current_win) > 0 then
+            bar.select(current_win, bar.items(current_win)[1])
+        else
+            close_if_empty()
+        end
         return
     end
 
@@ -543,7 +613,7 @@ vim.keymap.set("n", "<leader><C-q>", ":q<CR>", {
 })
 
 vim.keymap.set("n", "<leader><Esc>", function()
-    if not floating.reset_layout() then vim.cmd("DashboardQuit") end
+    vim.cmd("DashboardQuit")
 end, {
     noremap = true,
     silent = true,
@@ -579,6 +649,17 @@ vim.keymap.set({ "n", "i" }, "<C-s>", save_current_file, {
     silent = true,
     desc = "Save file",
 })
+
+for _, binding in ipairs({ {"h", -1}, {"<Left>", -1}, {"l", 1}, {"<Right>", 1} }) do
+    vim.keymap.set("n", "<leader>b" .. binding[1], function()
+        require("config.winbar").cycle(binding[2])
+    end, { silent = true, desc = "Switch adjacent winbar buffer" })
+end
+for _, binding in ipairs({ {"H", -1}, {"L", 1} }) do
+    vim.keymap.set("n", "<leader>b" .. binding[1], function()
+        require("config.winbar").move_current(binding[2])
+    end, { silent = true, desc = "Reorder current winbar buffer" })
+end
 
 vim.keymap.set("n", "<leader>bb", buffers.pick_current, {
     noremap = true,
@@ -684,7 +765,8 @@ vim.keymap.set("n", "<leader>ww", window_picker.focus_window, {
     desc = "Focus window",
 })
 
-vim.keymap.set("n", "<leader>wr", function()
+vim.keymap.set("n", "<leader>wl", function()
+    if floating.is_slot_window() then return end
     window_picker.swap_current_window_label({
         filetype = {
             "NvimTree",
@@ -696,6 +778,18 @@ end, {
     silent = true,
     desc = "Swap current window label",
 })
+
+vim.keymap.set("n", "<leader>wr", function()
+    if floating.reset_layout() then return end
+    local current = vim.api.nvim_get_current_win()
+    for _, win in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
+        if vim.api.nvim_win_get_config(win).relative == '' then
+            vim.api.nvim_win_call(win, function() vim.cmd('wincmd =') end)
+            break
+        end
+    end
+    if vim.api.nvim_win_is_valid(current) then vim.api.nvim_set_current_win(current) end
+end, {noremap = true, silent = true, desc = "Reset window layouts"})
 
 vim.keymap.set("n", "<leader>wv", function()
     vertical_split_or_empty()

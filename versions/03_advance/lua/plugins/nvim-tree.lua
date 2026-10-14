@@ -290,6 +290,7 @@ return {
                 " Navigation",
                 " Tab          Preview path/file or toggle folder",
                 " Enter / o    Open file or change cwd",
+                " c (root)     Change cwd when focused on the top root path",
                 " O            Open with OS default app",
                 " Double-click Same action as Tab/Enter by node type",
                 " Ctrl+double   Run the opposite mouse action",
@@ -466,6 +467,7 @@ return {
         end
 
         local function focus_mouse_node()
+            if require("config.winbar").forward_mouse("<LeftMouse>") then return end
             local mouse = vim.fn.getmousepos()
 
             if mouse.winid == 0 or not vim.api.nvim_win_is_valid(mouse.winid) then
@@ -478,9 +480,17 @@ return {
 
             vim.api.nvim_set_current_win(mouse.winid)
             vim.api.nvim_win_set_cursor(mouse.winid, { mouse.line, 0 })
+            local node = api.tree.get_node_under_cursor()
+            require("config.winbar").start_file_drag(
+                node and node.type == "file" and node.absolute_path or nil
+            )
         end
 
         local function open_mouse(invert)
+            if require("config.winbar").forward_mouse("<2-LeftMouse>") then return end
+            if require("config.tabs").forward_tabline_double_click() then
+                return
+            end
             focus_mouse_node()
 
             local node = api.tree.get_node_under_cursor()
@@ -508,6 +518,7 @@ return {
 
             on_attach = function(bufnr)
                 api.config.mappings.default_on_attach(bufnr)
+                require("config.tree_menu").attach(bufnr)
 
                 local function opts(desc)
                     return {

@@ -208,6 +208,10 @@ return {
         end
 
         local function click_dashboard_button()
+            if require("config.winbar").forward_mouse("<2-LeftMouse>") then return end
+            if require("config.tabs").forward_tabline_double_click() then
+                return
+            end
             local mouse = vim.fn.getmousepos()
             local win = mouse.winid
 

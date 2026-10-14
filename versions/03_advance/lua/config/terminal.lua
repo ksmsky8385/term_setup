@@ -70,7 +70,7 @@ function M.status_name()
         return ""
     end
 
-    return shell_name() .. " [Terminal]"
+    return "Terminal [" .. shell_name() .. "]"
 end
 
 function M.configure_window(win)

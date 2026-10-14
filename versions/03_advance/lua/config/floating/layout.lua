@@ -70,8 +70,12 @@ local function rectangles(node, rect, result)
 end
 
 function M.ensure(item)
-    item.panes = item.panes or { A = { id = "A", buf = item.buf, win = item.win, view = item.view, cursor = item.cursor } }
+    local created = not item.panes
+    item.panes = item.panes or { A = { id = "A", buf = item.buf, win = item.win, view = item.view, cursor = item.cursor, winbar_items = item.winbar_items } }
     item.layout = item.layout or leaf("A")
+    if created and state.valid_window(item.win) and package.loaded['config.winbar'] then
+        require('config.winbar').bind(item.win, item.panes.A)
+    end
     for pane_id, pane in pairs(item.panes) do
         if state.valid_window(pane.win) and state.valid_buffer(pane.buf) then
             state.mark_pane(pane.win, pane.buf, state.window_slot_id(pane.win), pane_id)
