@@ -14,6 +14,18 @@ local scrollable = {}
 local layout_signatures = {}
 local owners = {}
 local icon_highlights = {}
+local redraw_pending = false
+
+local function request_redraw()
+    if vim.v.vim_did_enter == 0 or redraw_pending then return end
+    redraw_pending = true
+    -- BufEnter/FileType can run while Alpha is still building its buffer.
+    -- Flush only after the event completes so no intermediate screen is shown.
+    vim.schedule(function()
+        redraw_pending = false
+        vim.cmd('redrawstatus!')
+    end)
+end
 
 local function empty_editor_buffer()
     local buf = vim.api.nvim_create_buf(false, false)
@@ -143,7 +155,7 @@ function M.refresh()
     if floating_window then
         for slot in pairs(require('config.floating.state').slots) do floating_window.update_title(slot) end
     end
-    if vim.v.vim_did_enter == 1 then vim.cmd('redrawstatus!') end
+    request_redraw()
 end
 
 function M.track(win)
@@ -612,7 +624,7 @@ function M.setup()
         if not scrollable[win] or not scrollable[win][direction] then return end
         local count = #M.items(win)
         offsets[win] = math.max(1, math.min(count, (offsets[win] or 1) + (direction == 1 and -1 or 1)))
-        if vim.v.vim_did_enter == 1 then vim.cmd('redrawstatus!') end
+        request_redraw()
     end
     local group = vim.api.nvim_create_augroup('ConfigWindowBuffers', { clear = true })
     vim.api.nvim_create_autocmd('ColorScheme', { group = group, callback = function() M.apply_highlights(); M.refresh() end })
