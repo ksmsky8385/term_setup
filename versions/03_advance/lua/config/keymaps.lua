@@ -228,16 +228,18 @@ local function is_ignored_quit_window(win)
     return ignored_quit_filetypes[filetype] == true or is_agentic_filetype(filetype)
 end
 
-local function close_target_window_count()
+local function close_target_window_count(tabpage)
     local count = 0
 
-    for _, win in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
+    for _, win in ipairs(vim.api.nvim_tabpage_list_wins(tabpage or 0)) do
         if vim.api.nvim_win_is_valid(win) then
             local buf = vim.api.nvim_win_get_buf(win)
             local filetype = vim.bo[buf].filetype
 
             if
-                filetype ~= "FloatingSlot"
+                vim.api.nvim_win_get_config(win).relative == ""
+                and not vim.wo[win].previewwindow
+                and filetype ~= "FloatingSlot"
                 and filetype ~= "NvimTree"
                 and filetype ~= "notify"
                 and not is_agentic_filetype(filetype)
@@ -269,9 +271,11 @@ local function buffer_visible_in_other_window(buf, current_win)
 end
 
 local function close_current_window_or_dashboard(current_win)
-    if close_target_window_count() > 1 then
+    if not vim.api.nvim_win_is_valid(current_win) then return end
+    if close_target_window_count(vim.api.nvim_win_get_tabpage(current_win)) > 1 then
         pcall(vim.api.nvim_win_close, current_win, true)
     else
+        vim.api.nvim_set_current_win(current_win)
         open_dashboard_home()
     end
 end

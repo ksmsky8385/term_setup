@@ -223,7 +223,10 @@ function M.open_buffer_in_split(buf, target_win, split_cmd)
         return false
     end
 
-    vim.api.nvim_win_set_buf(0, buf)
+    local split_win = vim.api.nvim_get_current_win()
+    require("config.winbar").clear_window(split_win)
+    vim.api.nvim_win_set_buf(split_win, buf)
+    require("config.winbar").track(split_win)
     empty_buffers.cleanup({
         keep = { buf },
     })

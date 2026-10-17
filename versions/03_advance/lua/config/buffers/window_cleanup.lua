@@ -24,7 +24,9 @@ local function target_window_count(tabpage)
             local filetype = vim.bo[buf].filetype
 
             if
-                filetype ~= "FloatingSlot"
+                vim.api.nvim_win_get_config(win).relative == ""
+                and not vim.wo[win].previewwindow
+                and filetype ~= "FloatingSlot"
                 and filetype ~= "NvimTree"
                 and filetype ~= "TelescopePrompt"
                 and filetype ~= "TelescopeResults"

@@ -84,86 +84,132 @@ return {
             return header
         end
 
-        local function quit_blocker()
+        local function quit_blockers()
+            local modified, terminals = {}, {}
             for _, buf in ipairs(vim.api.nvim_list_bufs()) do
-                if
-                    vim.api.nvim_buf_is_valid(buf)
-                    and vim.bo[buf].modified
-                    and vim.bo[buf].buftype == ""
-                then
+                if vim.api.nvim_buf_is_valid(buf) then
                     local name = vim.api.nvim_buf_get_name(buf)
-
-                    if name == "" then
-                        name = "[No Name]"
-                    else
-                        name = vim.fn.fnamemodify(name, ":t")
-                    end
-
-                    return "Unsaved buffer: " .. name .. ". Save it or close it before quitting."
-                end
-            end
-
-            for _, buf in ipairs(vim.api.nvim_list_bufs()) do
-                if
-                    vim.api.nvim_buf_is_valid(buf)
-                    and vim.bo[buf].buftype == "terminal"
-                then
-                    local job_id = vim.b[buf].terminal_job_id
-
-                    if
-                        type(job_id) == "number"
-                        and vim.fn.jobwait({ job_id }, 0)[1] == -1
-                    then
-                        return "Running terminals remain. Close them from Space bb or :TKill before quitting."
+                    if vim.bo[buf].modified and vim.bo[buf].buftype == "" then
+                        name = name == "" and "[No Name]" or vim.fn.fnamemodify(name, ":~:.")
+                        table.insert(modified, string.format("  #%d %s", buf, name))
+                    elseif vim.bo[buf].buftype == "terminal" then
+                        local job = vim.b[buf].terminal_job_id
+                        if type(job) == "number" and vim.fn.jobwait({job}, 0)[1] == -1 then
+                            table.insert(terminals, string.format("  #%d %s", buf, name))
+                        end
                     end
                 end
             end
-
-            return nil
+            local summary
+            if #modified > 0 and #terminals > 0 then
+                summary = "Unsaved buffers and running terminals"
+            elseif #modified > 0 then
+                summary = "Unsaved buffers"
+            elseif #terminals > 0 then
+                summary = "Running terminals"
+            end
+            return {modified = modified, terminals = terminals, summary = summary}
         end
 
-        local function clear_command_message()
-            vim.cmd("redraw")
-            vim.api.nvim_echo({}, false, {})
-        end
-
+        -- A nonblocking dialog ignores the release following a double-click and
+        -- provides the same confirmation for mouse and keyboard entry points.
+        local quit_window
         local function confirm_quit()
-            local blocker = quit_blocker()
-
-            if blocker then
-                vim.api.nvim_echo({
-                    {
-                        blocker .. " Press Q to force quit, Esc or any other key to cancel.",
-                        "WarningMsg",
-                    },
-                }, false, {})
-
-                local ok, input = pcall(vim.fn.getcharstr)
-
-                clear_command_message()
-
-                if ok and input == "Q" then
-                    vim.cmd("qa!")
+            if quit_window and vim.api.nvim_win_is_valid(quit_window) then
+                vim.api.nvim_set_current_win(quit_window)
+                return
+            end
+            local blockers = quit_blockers()
+            local blocked = blockers.summary ~= nil
+            local accept = blocked and "[ Q: Force quit ]" or "[ q: Quit Neovim ]"
+            local cancel = "[ c / Esc: Cancel ]"
+            local lines = {"Quit Neovim?", "", blockers.summary or "Close all Neovim windows?"}
+            if blocked then table.insert(lines, "") end
+            if #blockers.modified > 0 then
+                if #blockers.terminals > 0 then table.insert(lines, "Buffers:") end
+                vim.list_extend(lines, blockers.modified)
+            end
+            if #blockers.terminals > 0 then
+                if #blockers.modified > 0 then table.insert(lines, "Terminals:") end
+                vim.list_extend(lines, blockers.terminals)
+            end
+            table.insert(lines, "")
+            local accept_row = #lines + 1
+            table.insert(lines, accept)
+            local cancel_row = #lines + 1
+            table.insert(lines, cancel)
+            local width = math.max(1, math.min(76, vim.o.columns - 4))
+            local height = 0
+            for _, line in ipairs(lines) do
+                height = height + math.max(1, math.ceil(vim.fn.strdisplaywidth(line) / width))
+            end
+            height = math.min(height, math.max(1, vim.o.lines - 4))
+            local buf = vim.api.nvim_create_buf(false, true)
+            vim.bo[buf].bufhidden = "wipe"
+            vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
+            vim.bo[buf].modifiable = false
+            local win = vim.api.nvim_open_win(buf, true, {
+                relative = "editor",
+                row = math.max(0, math.floor((vim.o.lines - height) / 2) - 1),
+                col = math.max(0, math.floor((vim.o.columns - width) / 2)),
+                width = width,
+                height = height,
+                style = "minimal",
+                border = "rounded",
+                zindex = 100,
+            })
+            quit_window = win
+            vim.wo[win].wrap = true
+            vim.wo[win].cursorline = true
+            vim.api.nvim_win_set_cursor(win, {cancel_row, 0})
+            local closed = false
+            local function dismiss()
+                if closed then return end
+                closed = true
+                quit_window = nil
+                if vim.api.nvim_win_is_valid(win) then vim.api.nvim_win_close(win, true) end
+            end
+            local function finish()
+                dismiss()
+                -- Recheck normal quit protection when the choice is made.
+                local current_blockers = quit_blockers()
+                if not blocked and current_blockers.summary then
+                    confirm_quit()
+                    return
                 end
-
-                return
+                vim.cmd(blocked and "qa!" or "qa")
             end
-
-            vim.api.nvim_echo({
-                { "Quit Neovim? Press Enter, q, or Q to confirm; Esc or any other key cancels.", "WarningMsg" },
-            }, false, {})
-
-            local ok, input = pcall(vim.fn.getcharstr)
-
-            clear_command_message()
-
-            if not ok then
-                return
+            local function click()
+                local mouse = vim.fn.getmousepos()
+                if mouse.winid ~= win then return end
+                if mouse.line == accept_row and mouse.column >= 1 and mouse.column <= #accept then
+                    finish()
+                elseif mouse.line == cancel_row and mouse.column >= 1 and mouse.column <= #cancel then
+                    dismiss()
+                end
             end
-
-            if input == "\13" or input == "\10" or input == "\r" or input == "q" or input == "Q" then
-                vim.cmd("qa")
+            local opts = {buffer = buf, silent = true, nowait = true}
+            for _, key in ipairs({"<LeftMouse>", "<2-LeftMouse>"}) do
+                vim.keymap.set("n", key, click, opts)
             end
+            for _, key in ipairs({"<LeftRelease>", "<LeftDrag>"}) do
+                vim.keymap.set("n", key, "<Nop>", opts)
+            end
+            for _, key in ipairs({"c", "<Esc>", "<C-c>"}) do
+                vim.keymap.set("n", key, dismiss, opts)
+            end
+            vim.keymap.set("n", "<CR>", function()
+                if vim.api.nvim_win_get_cursor(win)[1] == accept_row then finish() else dismiss() end
+            end, opts)
+            vim.keymap.set("n", "Q", finish, opts)
+            vim.keymap.set("n", "q", blocked and "<Nop>" or finish, opts)
+            for _, key in ipairs({"<Tab>", "<S-Tab>", "<Up>", "<Down>"}) do
+                vim.keymap.set("n", key, function()
+                    local row = vim.api.nvim_win_get_cursor(win)[1] == accept_row and cancel_row or accept_row
+                    vim.api.nvim_win_set_cursor(win, {row, 0})
+                end, opts)
+            end
+            vim.api.nvim_create_autocmd("WinLeave", {buffer = buf, once = true, callback = dismiss})
         end
 
         vim.api.nvim_create_user_command("DashboardQuit", confirm_quit, {})
@@ -241,7 +287,11 @@ return {
                     vim.api.nvim_set_current_win(win)
                     vim.api.nvim_win_set_cursor(win, { mouse.line, 0 })
                     alpha.move_cursor(win)
-                    button.on_press()
+                    if dashboard_shortcut(button) == "q" then
+                        confirm_quit()
+                    else
+                        button.on_press()
+                    end
                     return
                 end
             end

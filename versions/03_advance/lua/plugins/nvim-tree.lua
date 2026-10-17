@@ -388,7 +388,11 @@ return {
 
             local split_win = vim.api.nvim_get_current_win()
 
+            -- :split briefly displays the source buffer and triggers WinEnter.
+            -- It is not part of the new window's browsing history.
+            require("config.winbar").clear_window(split_win)
             open_file_in_window(node, split_win)
+            require("config.winbar").track(split_win)
 
             local ok_empty, empty_buffers = pcall(require, "config.empty_buffers")
 
