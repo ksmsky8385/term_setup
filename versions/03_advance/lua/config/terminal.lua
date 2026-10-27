@@ -147,6 +147,14 @@ function M.create_buffer_terminal(opts)
     vim.bo[terminal_buf].buflisted = true
 
     local current_win = vim.api.nvim_get_current_win()
+    if opts.split_cmd then
+        -- Splitting briefly displays and tracks the source buffer. Only the
+        -- newly created terminal belongs to this window's initial history.
+        local winbar = require("config.winbar")
+        winbar.clear_window(current_win)
+        winbar.track(current_win)
+    end
+
     local ok_floating, floating = pcall(require, "config.floating")
 
     if ok_floating and floating.is_slot_window(current_win) then
