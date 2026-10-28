@@ -723,6 +723,14 @@ end, {
     desc = "Force delete current buffer",
 })
 
+vim.keymap.set("n", "<leader>bc", function()
+    require("config.winbar").clean_current()
+end, {
+    noremap = true,
+    silent = true,
+    desc = "Clean current winbar (keep active, modified and terminal buffers)",
+})
+
 vim.keymap.set("n", "<leader>bo", function()
     buffers.delete_others(false)
 end, {

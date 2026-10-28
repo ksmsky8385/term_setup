@@ -264,6 +264,19 @@ function M.close(win, buf, force, on_closed)
     return true
 end
 
+function M.clean_current()
+    if not require('config.editor_settings').get('winbar') then return end
+    local win = vim.api.nvim_get_current_win()
+    if not editor(win) then return end
+    local current = vim.api.nvim_win_get_buf(win)
+    -- items() returns a snapshot; close() preserves references in other windows.
+    for _, buf in ipairs(M.items(win)) do
+        if buf ~= current and not vim.bo[buf].modified and not terminal(buf) then
+            M.close(win, buf, false)
+        end
+    end
+end
+
 local function region(id, callback, text)
     return '%' .. id .. '@v:lua.' .. callback .. '@' .. text:gsub('%%', '%%%%') .. '%X'
 end
