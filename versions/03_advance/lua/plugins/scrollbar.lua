@@ -36,7 +36,7 @@ local enabled_on_startup = toggle_state.read("scrollview", false)
 
 return {
     "dstein64/nvim-scrollview",
-    lazy = not enabled_on_startup,
+    lazy = false,
     build = function(plugin)
         enable_terminal_buffers(plugin.dir)
     end,
