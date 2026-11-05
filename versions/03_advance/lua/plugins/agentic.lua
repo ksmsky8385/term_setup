@@ -55,6 +55,13 @@ local function apply_agentic_prompt_highlights()
         bg = input_line_bg,
         bold = false,
     })
+    vim.api.nvim_set_hl(0, "AgenticUsageHeader", {
+        fg = 0xffffff,
+        bg = input_line_bg,
+        bold = false,
+    })
+    vim.api.nvim_set_hl(0, "AgenticUsageLow", { fg = 0xffff00, bg = input_line_bg })
+    vim.api.nvim_set_hl(0, "AgenticUsageCritical", { fg = 0xff0000, bg = input_line_bg })
 end
 
 local function agentic_session_cwd(session_state)
@@ -262,6 +269,8 @@ local function refresh_headers_after_show()
         -- exists so the chat header keeps its model and usage information.
         self:schedule_header_refresh()
 
+        require("config.agentic_limits").on_visible()
+
         if should_focus_prompt then
             vim.schedule(function()
                 local input_win = self.win_nrs.input
@@ -313,6 +322,16 @@ return {
             pattern = "Agentic*",
             callback = function(args)
                 local leader = vim.g.mapleader or "\\"
+                local filetype = vim.bo[args.buf].filetype
+                if filetype == "AgenticInput" or filetype == "AgenticChat" then
+                    vim.keymap.set({ "n", "v" }, leader .. "au", function()
+                        require("config.agentic_limits").toggle()
+                    end, {
+                        buffer = args.buf,
+                        silent = true,
+                        desc = "Toggle Agentic usage header",
+                    })
+                end
                 if vim.bo[args.buf].filetype == "AgenticChat" then
                     vim.keymap.set("n", "gF", function()
                         local win = vim.api.nvim_get_current_win()
@@ -406,7 +425,20 @@ return {
         })
     end,
     opts = {
-        provider = "codex-acp",
+        provider = sidebar_settings.get("agentic_provider"),
+        hooks = {
+            on_create_session_response = function(data)
+                require("config.agentic_config").remember_provider(data)
+                require("config.agentic_limits").on_open(data)
+            end,
+            on_prompt_submit = function(data)
+                require("config.agentic_config").remember_provider(data)
+                require("config.agentic_limits").on_submit(data)
+            end,
+            on_response_complete = function(data)
+                require("config.agentic_limits").on_complete(data)
+            end,
+        },
         windows = {
             position = sidebar_settings.get("agentic_position"),
             width = sidebar_settings.get("agentic_width"),
@@ -454,8 +486,8 @@ return {
             threshold = 1,
         },
         headers = {
-            chat = function()
-                return ""
+            chat = function(parts, state)
+                return require("config.agentic_limits").header(parts, state)
             end,
             input = agentic_cwd_header,
         },
@@ -483,6 +515,7 @@ return {
         refresh_headers_after_show()
         require("agentic").setup(opts)
         apply_agentic_prompt_highlights()
+        require("config.agentic_limits").setup()
     end,
     keys = {
         {

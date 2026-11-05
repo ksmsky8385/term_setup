@@ -60,6 +60,10 @@ return {
         heading = {
             sign = false,
         },
+        pipe_table = {
+            cell = "padded",
+            wrap = true,
+        },
         code = {
             sign = false,
             width = "block",

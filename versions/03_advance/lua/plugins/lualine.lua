@@ -97,10 +97,7 @@ return {
 
         local function agentic_session_state()
             local win = vim.g.statusline_winid or vim.api.nvim_get_current_win()
-            local tab = vim.api.nvim_win_get_tabpage(win)
-            local registry = require("agentic.session_registry")
-            local session = registry.sessions[tab]
-            return session and session.session_state
+            return require("config.agentic_config").state_for_window(win)
         end
 
         local function agentic_status_name()
@@ -118,6 +115,7 @@ return {
                     )
 
                 if thought_level and thought_level ~= "" then
+                    thought_level = thought_level:gsub("^[Tt]hinking:%s*", "")
                     model = string.format("%s (%s)", model, thought_level)
                 end
 

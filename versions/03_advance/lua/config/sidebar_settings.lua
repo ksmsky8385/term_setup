@@ -9,6 +9,8 @@ local defaults = {
     agentic_position = "right",
     agentic_width = 55,
     agentic_height = 8,
+    agentic_usage = true,
+    agentic_provider = "codex-acp",
 }
 
 local limits = {
@@ -20,6 +22,12 @@ local limits = {
 local values
 
 local function valid_value(name, value)
+    if name == "agentic_provider" then
+        return type(value) == "string" and value:match("^[%w_-]+$") ~= nil
+    end
+    if name == "agentic_usage" then
+        return type(value) == "boolean"
+    end
     if name == "nvim_tree_mode" then
         return value == "split" or value == "float"
     end
@@ -314,7 +322,9 @@ function M.set(name, value)
     values[name] = value
     save()
 
-    if name == "nvim_tree_mode" then
+    if name == "agentic_usage" then
+        require("config.agentic_limits").refresh()
+    elseif name == "nvim_tree_mode" then
         apply_nvim_tree_mode(value)
     elseif (name == "nvim_tree_position" or name == "nvim_tree_width")
         and values.nvim_tree_mode == "float" then

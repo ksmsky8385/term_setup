@@ -1,6 +1,30 @@
 local M = {}
 
-local function select_session(items, on_choice)
+-- Registry keys are session IDs, not tab handles. Resolve the buffer whose
+-- statusline is being drawn, including inactive windows and retained sessions.
+function M.state_for_window(win)
+    if not vim.api.nvim_win_is_valid(win) then return nil end
+    local buf = vim.api.nvim_win_get_buf(win)
+    for _, session in pairs(require("agentic.session_registry").sessions) do
+        local buffers = session.widget and session.widget.buf_nrs or {}
+        for _, candidate in pairs(buffers) do
+            if candidate == buf then return session.session_state end
+        end
+    end
+end
+
+function M.remember_provider(data)
+    if data.err or not data.session_id then return end
+    local session = require("agentic.session_registry").sessions[data.session_key]
+    if not session or session.session_id ~= data.session_id then return end
+    local provider = session.provider_name
+    if require("config.sidebar_settings").set("agentic_provider", provider) then
+        require("agentic.config").provider = provider
+    end
+end
+
+local function select_session(items, on_choice, opts)
+    opts = opts or {}
     local ok_pickers, pickers = pcall(require, "telescope.pickers")
     local ok_finders, finders = pcall(require, "telescope.finders")
     local ok_config, telescope_config =
@@ -39,8 +63,8 @@ local function select_session(items, on_choice)
             layout_config = {
                 preview_width = 0.5,
             },
-            prompt_title = "Agentic sessions",
-            results_title = "Enter restore",
+            prompt_title = opts.archived and "Agentic archives" or "Agentic sessions",
+            results_title = opts.help or "Enter restore",
             preview_title = "Session info",
         }
     else
@@ -48,7 +72,7 @@ local function select_session(items, on_choice)
             previewer = false,
             width = 0.78,
             height = 0.55,
-            prompt_title = "Agentic sessions",
+            prompt_title = opts.archived and "Agentic archives" or "Agentic sessions",
             results_title = false,
         })
     end
@@ -81,17 +105,20 @@ local function select_session(items, on_choice)
                         end,
                     })
                 or false,
-            attach_mappings = function(prompt_bufnr)
+            attach_mappings = function(prompt_bufnr, map)
                 actions.select_default:replace(function()
                     local entry = action_state.get_selected_entry()
                     actions.close(prompt_bufnr)
                     on_choice(entry and entry.value or nil)
                 end)
+                if opts.attach_mappings then opts.attach_mappings(prompt_bufnr, map) end
                 return true
             end,
         })
         :find()
 end
+
+M.select_session = select_session
 
 local function preview_lines(
     title,
@@ -150,6 +177,18 @@ local function brief_title(title)
     return title
 end
 
+function M.session_item(item, provider)
+    local value = vim.deepcopy(item)
+    local date = (item.updated_at or "unknown date"):sub(1, 16):gsub("T", " ")
+    local title = brief_title(item.title)
+    value.display = string.format("[%s]  %s  %s", provider, date, title)
+    value.preview_lines = preview_lines(item.title, title, provider, date, item.session_id)
+    if item.path then
+        vim.list_extend(value.preview_lines, { "", "**File:** " .. item.path })
+    end
+    return value
+end
+
 local function restore(context, choice)
     local registry = require("agentic.session_registry")
     local existing = registry.find_by_acp_session_id(choice.session_id, context.agent)
@@ -159,7 +198,7 @@ local function restore(context, choice)
     end
 
     registry.choose_session_lifecycle(context.source, "Restore session:", function(destroy_source)
-        registry.replace(context.source, context.provider_name, {
+        local target = registry.replace(context.source, context.provider_name, {
             kind = "load",
             session_id = choice.session_id,
             title = choice.title,
@@ -168,6 +207,14 @@ local function restore(context, choice)
             agent = context.agent,
             retain_source = context.source ~= nil and not destroy_source,
         })
+        if target then
+            target:on_session_ready(function()
+                require("config.agentic_limits").on_open({
+                    session_key = target.session_key,
+                    session_id = target.session_id,
+                })
+            end, function() end)
+        end
     end)
 end
 
@@ -185,6 +232,10 @@ function M.show()
     local cwd = vim.fn.getcwd()
 
     agent:when_ready(function()
+        if provider_name == "codex-acp" or provider_name == "pi-acp" then
+            require("config.agentic_archive").show(context, restore)
+            return
+        end
         agent:list_sessions(cwd, function(result, err)
             vim.schedule(function()
                 if err or not result then
