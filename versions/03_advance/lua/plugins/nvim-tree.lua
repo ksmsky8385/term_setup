@@ -770,10 +770,7 @@ return {
             local count = vim.api.nvim_buf_line_count(buf)
             local function highlight_row(row, group)
                 vim.api.nvim_buf_set_extmark(buf, root_namespace, row, 0, {
-                    end_row = row + 1,
-                    hl_group = group,
                     line_hl_group = group,
-                    hl_eol = true,
                     priority = 200,
                 })
             end
