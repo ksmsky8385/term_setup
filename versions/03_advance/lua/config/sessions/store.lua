@@ -144,11 +144,27 @@ function M.save(slot, force, opts)
 
     stop_debugger_for_session_save()
     hide_floating_slots()
+    local agentic = require("config.sessions.agentic").snapshot()
+    local focused_buf = vim.api.nvim_get_current_buf()
+    local focused_tab = vim.api.nvim_get_current_tabpage()
+    local function restore_agentic_windows()
+        require("config.sessions.agentic").restore(agentic)
+        if vim.api.nvim_tabpage_is_valid(focused_tab) then
+            for _, win in ipairs(vim.api.nvim_tabpage_list_wins(focused_tab)) do
+                if vim.api.nvim_win_get_buf(win) == focused_buf
+                    and vim.api.nvim_win_get_config(win).relative == "" then
+                    vim.api.nvim_set_current_win(win)
+                    break
+                end
+            end
+        end
+    end
     hide_agentic_widgets()
 
     local ok, layout = pcall(session_layout.snapshot)
 
     if not ok then
+        restore_agentic_windows()
         vim.notify("Failed to save session " .. slot .. ": " .. layout, vim.log.levels.ERROR)
         if opts.on_cancel then
             opts.on_cancel()
@@ -165,10 +181,17 @@ function M.save(slot, force, opts)
     metadata.floating_slots = hidden_floating_slots()
     metadata.tree = current_tree_state()
     metadata.layout = layout
+    metadata.agentic = agentic
     metadata.breakpoints = session_breakpoints.snapshot()
     metadata.saved_at = os.date("%Y-%m-%d %H:%M:%S")
 
-    write_metadata(slot, metadata)
+    local written, write_error = pcall(write_metadata, slot, metadata)
+    restore_agentic_windows()
+    if not written then
+        vim.notify("Failed to save session " .. slot .. ": " .. tostring(write_error), vim.log.levels.ERROR)
+        if opts.on_cancel then opts.on_cancel() end
+        return
+    end
     pcall(vim.fn.delete, session_paths.session_path(slot))
 
     if opts.notify ~= false then

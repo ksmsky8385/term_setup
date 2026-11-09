@@ -128,8 +128,47 @@ def selected(items, request):
     return item
 
 
+def session_in_use(item):
+    """Best-effort local detection: open transcript or explicit session argument."""
+    transcript = item.get('path')
+    session_id = item['session_id'].encode()
+    for process in Path('/proc').iterdir():
+        if not process.name.isdigit() or int(process.name) == os.getpid():
+            continue
+        try:
+            if process.stat().st_uid != os.getuid():
+                continue
+            arguments = (process / 'cmdline').read_bytes().split(b'\0')
+            if session_id in arguments:
+                return True
+            if transcript:
+                for fd in (process / 'fd').iterdir():
+                    try:
+                        if os.readlink(fd) == transcript:
+                            return True
+                    except OSError:
+                        pass
+        except OSError:
+            continue
+    return False
+
+
+def availability(request):
+    if request['provider'] == 'codex-acp':
+        with Codex() as client:
+            items = codex_items(client, False)
+    elif request['provider'] == 'pi-acp':
+        items = pi_items(pi_roots()[0])
+    else:
+        return {'available': False}
+    item = next((item for item in items if item['session_id'] == request['session_id']), None)
+    return {'available': item is not None and not session_in_use(item)}
+
+
 def execute(request):
     action, provider = request['action'], request['provider']
+    if action == 'availability':
+        return availability(request)
     if action not in ('list', 'archive', 'unarchive', 'delete'):
         raise ValueError('Unknown action')
     archived = request.get('archived', False) if action == 'list' else action != 'archive'

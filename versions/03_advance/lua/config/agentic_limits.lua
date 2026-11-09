@@ -71,7 +71,7 @@ local function escape(text)
     return text:gsub("%%", "%%%%")
 end
 
-function M.header(_, state)
+function M.header(_, state, width)
     if not enabled() or not state then return "" end
     local provider = state.get_provider_name and state:get_provider_name()
     local supported_provider = provider == "codex-acp" or provider == "pi-acp"
@@ -80,13 +80,12 @@ function M.header(_, state)
     local config = package.loaded["agentic.config"]
     for _, key in ipairs({ "codex-acp", "pi-acp" }) do
         local entry = config and config.acp_providers and config.acp_providers[key]
-        if entry and entry.name == provider then supported_provider = true end
+        if entry and entry.name == provider then supported_provider = true; provider = key end
     end
     if not supported_provider then return "" end
+    local prefix = escape(provider:gsub("%-", " ")) .. " - "
     local base = "%#AgenticUsageHeader#"
-    if not cached then return base .. "Codex usage: loading..." end
-    if cached.err then return base .. escape("Codex usage: " .. cached.err) end
-    local result = cached.result
+    local result = cached and cached.result
     local buckets = type(result) == "table" and result.rateLimitsByLimitId
     local limits = type(buckets) == "table" and buckets.codex
         or (type(result) == "table" and result.rateLimits)
@@ -109,7 +108,33 @@ function M.header(_, state)
             end
         end
     end
-    return base .. (#parts > 0 and ("Left: " .. table.concat(parts, " | ")) or "Codex usage: unavailable")
+    local text = base .. prefix .. (#parts > 0 and ("Left: " .. table.concat(parts, " | ")) or "Left: unavailable")
+    if not cached then text = base .. prefix .. "Left: loading..."
+    elseif cached.err then text = base .. prefix .. escape("Left: " .. cached.err) end
+    if width then
+        local plain = vim.api.nvim_eval_statusline(text, { maxwidth = 10000 }).str
+        if vim.fn.strdisplaywidth(plain) > width then
+            text = text:gsub(" %([^)]*%)", "")
+        end
+        local rendered = vim.api.nvim_eval_statusline(text, { maxwidth = 10000, highlights = true })
+        if vim.fn.strdisplaywidth(rendered.str) > width then
+            local suffix = string.rep(".", math.min(3, width))
+            local budget, used, offset, index = width - #suffix, 0, 0, 1
+            local clipped = base
+            for _, character in ipairs(vim.fn.split(rendered.str, "\\zs")) do
+                local cells = vim.fn.strdisplaywidth(character)
+                if used + cells > budget then break end
+                while rendered.highlights[index] and rendered.highlights[index].start <= offset do
+                    clipped = clipped .. "%#" .. rendered.highlights[index].group .. "#"
+                    index = index + 1
+                end
+                clipped = clipped .. escape(character)
+                used, offset = used + cells, offset + #character
+            end
+            text = clipped .. base .. suffix
+        end
+    end
+    return text
 end
 
 function M.interval()
@@ -142,6 +167,32 @@ function M.tick(now, force)
             redraw_headers()
         end)
     end)
+end
+
+-- Agentic wraps custom headers in Normal highlights. Replace only the usage
+-- winbar after its scheduled render so the padding shares the header background.
+function M.setup_header()
+    local decoration = require("agentic.ui.window_decoration")
+    if decoration._usage_full_width then return end
+    decoration._usage_full_width = true
+    local original = decoration.render_header
+    decoration.render_header = function(buf, panel, context, state)
+        original(buf, panel, context, state)
+        if panel ~= "chat" then return end
+        vim.schedule(function()
+            if not vim.api.nvim_buf_is_valid(buf) then return end
+            local owner = require("agentic.ui.widget_registry").get(buf)
+            local session_state = state or (owner and owner.session_state)
+            for _, win in ipairs(vim.fn.win_findbuf(buf)) do
+                local text = M.header(nil, session_state, vim.api.nvim_win_get_width(win))
+                if text ~= "" then
+                    vim.wo[win].winbar = "%#AgenticUsageHeader#%=" .. text
+                        .. "%#AgenticUsageHeader#%="
+                end
+            end
+        end)
+    end
+    vim.api.nvim_create_autocmd("WinResized", { callback = redraw_headers })
 end
 
 function M.setup()

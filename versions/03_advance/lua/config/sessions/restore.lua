@@ -193,6 +193,7 @@ function M.after_load(metadata)
         session_breakpoints.restore(metadata.breakpoints)
         restore_floating_slots(metadata.floating_slots)
         empty_buffers.cleanup()
+        require("config.sessions.agentic").restore(metadata.agentic)
         return
     end
 
@@ -200,6 +201,7 @@ function M.after_load(metadata)
     restore_terminals(metadata.terminals)
     restore_floating_slots(metadata.floating_slots)
     restore_tree(metadata.tree)
+    require("config.sessions.agentic").restore(metadata.agentic)
     empty_buffers.cleanup()
 end
 

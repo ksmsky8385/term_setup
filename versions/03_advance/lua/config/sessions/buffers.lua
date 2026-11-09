@@ -75,6 +75,7 @@ local function session_load_blockers(buffers)
 end
 
 local function clear_session_load_buffers(buffers, force)
+    require("config.sessions.agentic").hide()
     vim.cmd("enew")
 
     local keep = vim.api.nvim_get_current_buf()

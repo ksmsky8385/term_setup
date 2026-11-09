@@ -43,7 +43,7 @@ answer(20, 21)
 assert(header():find('5h %%#AgenticUsageCritical#20%%%%'))
 assert(header():find('Weekly %%#AgenticUsageLow#21%%%%'))
 local rendered = vim.api.nvim_eval_statusline(header(), { use_winbar = true, maxwidth = 100 }).str
-assert(rendered == 'Left: 5h 20% | Weekly 21%', rendered)
+assert(rendered == 'pi acp - Left: 5h 20% | Weekly 21%', rendered)
 local codex_state = SessionState:new({}, agent_config.acp_providers['codex-acp'].name)
 assert(limits.header(nil, codex_state) ~= '', 'Codex display name must render')
 assert(limits.header(nil, SessionState:new({}, 'Other ACP')) == '')

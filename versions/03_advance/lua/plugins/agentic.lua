@@ -512,6 +512,7 @@ return {
     config = function(_, opts)
         allow_dashboard_as_fallback()
         track_agentic_session_cwd()
+        require("config.agentic_limits").setup_header()
         refresh_headers_after_show()
         require("agentic").setup(opts)
         apply_agentic_prompt_highlights()

@@ -65,12 +65,30 @@ return {
             end
         end
 
+        local root_namespace = vim.api.nvim_create_namespace("TreeRootBackground")
+
         local function restore_nvim_tree_highlights()
             local ok, appearance = pcall(require, "nvim-tree.appearance")
 
             if ok then
                 appearance.highlight()
             end
+            local bar = vim.api.nvim_get_hl(0, { name = "ConfigWinbarFill", link = false })
+            if not bar.bg then
+                require("config.winbar").apply_highlights()
+                bar = vim.api.nvim_get_hl(0, { name = "ConfigWinbarFill", link = false })
+            end
+            local function mix_white(color, amount)
+                local function channel(shift)
+                    local value = math.floor(color / shift) % 256
+                    return math.floor(value + (255 - value) * amount + 0.5)
+                end
+                return channel(65536) * 65536 + channel(256) * 256 + channel(1)
+            end
+            local background = bar.bg
+            local focused = mix_white(background, 0.10)
+            vim.api.nvim_set_hl(0, "TreeRootBackground", { bg = background, ctermbg = 237 })
+            vim.api.nvim_set_hl(0, "TreeFocusedBackground", { bg = focused, ctermbg = 240 })
         end
 
         local function close_preview()
@@ -190,6 +208,7 @@ return {
             vim.api.nvim_buf_set_lines(preview_buf, 0, -1, false, lines)
             vim.bo[preview_buf].modifiable = false
             vim.bo[preview_buf].readonly = true
+            vim.b[preview_buf].markdown_preview_source = opts.source_path
 
             if filetype then
                 vim.bo[preview_buf].filetype = filetype
@@ -275,6 +294,7 @@ return {
                 vim.filetype.match({ filename = node.absolute_path }),
                 {
                     wrap = true,
+                    source_path = node.absolute_path,
                 }
             )
         end
@@ -688,6 +708,7 @@ return {
             end,
 
             view = {
+                cursorline = false,
                 side = sidebar_settings.get("nvim_tree_position"),
                 width = sidebar_settings.get("nvim_tree_width"),
                 preserve_window_proportions = true,
@@ -743,6 +764,38 @@ return {
             },
         })
 
+        local function highlight_tree_rows(buf, win)
+            if not buf or not vim.api.nvim_buf_is_valid(buf) or vim.bo[buf].filetype ~= "NvimTree" then return end
+            vim.api.nvim_buf_clear_namespace(buf, root_namespace, 0, -1)
+            local count = vim.api.nvim_buf_line_count(buf)
+            local function highlight_row(row, group)
+                vim.api.nvim_buf_set_extmark(buf, root_namespace, row, 0, {
+                    end_row = row + 1,
+                    hl_group = group,
+                    line_hl_group = group,
+                    hl_eol = true,
+                    priority = 200,
+                })
+            end
+            if count > 0 then highlight_row(0, "TreeRootBackground") end
+            if win and vim.api.nvim_win_is_valid(win) then
+                vim.wo[win].cursorline = false
+                local row = vim.api.nvim_win_get_cursor(win)[1] - 1
+                if row > 0 and row < count then highlight_row(row, "TreeFocusedBackground") end
+            end
+        end
+        api.events.subscribe(api.events.Event.TreeRendered, function(data)
+            restore_nvim_tree_highlights()
+            highlight_tree_rows(data.bufnr, data.winnr)
+        end)
+        vim.api.nvim_create_autocmd({ "CursorMoved", "BufWinEnter" }, {
+            callback = function(args)
+                if vim.bo[args.buf].filetype == "NvimTree" then
+                    highlight_tree_rows(args.buf, vim.api.nvim_get_current_win())
+                end
+            end,
+        })
+
         restore_nvim_tree_highlights()
 
         vim.api.nvim_create_autocmd("VimResized", {
@@ -750,7 +803,9 @@ return {
         })
 
         vim.api.nvim_create_autocmd("ColorScheme", {
-            callback = restore_nvim_tree_highlights,
+            callback = function()
+                vim.schedule(restore_nvim_tree_highlights)
+            end,
         })
 
         vim.api.nvim_create_autocmd("QuitPre", {

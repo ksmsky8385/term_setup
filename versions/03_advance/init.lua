@@ -4,6 +4,7 @@ vim.opt.titlestring = [[%{getcwd() == expand('~') ? 'nvim' : 'nvim: ' . fnamemod
 require("config.options")
 require("config.paths")
 require("config.autocmds")
+require("config.markdown_links").setup()
 require("config.editor_settings").setup()
 require("config.winbar").setup()
 require("config.terminal").setup()
